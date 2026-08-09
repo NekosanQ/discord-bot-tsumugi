@@ -1,0 +1,23 @@
+{
+    "name": "@tsumugi/api",
+    "version": "3.0.0",
+    "private": true,
+    "description": "Tsumugi server management API",
+    "type": "module",
+    "main": "dist/index.js",
+    "engines": {
+        "node": "24.x",
+        "npm": ">=10"
+    },
+    "scripts": {
+        "compile": "tsc -p tsconfig.build.json",
+        "typecheck": "tsc --noEmit -p tsconfig.test.json",
+        "test:unit": "tsx --test \"tests/**/*.test.ts\"",
+        "test:integration": "tsx --test --test-concurrency=1 \"integration-tests/**/*.test.ts\"",
+        "test": "npm run test:unit && npm run test:integration",
+        "check:architecture": "eslint src tests integration-tests --max-warnings=0 --no-error-on-unmatched-pattern",
+        "check": "npm run lint:prettier && npm run check:architecture && npm run typecheck && npm run test:unit",
+        "lint:prettier": "prettier --check --no-error-on-unmatched-pattern src tests integration-tests package.json \"tsconfig*.json\"",
+        "fix:prettier": "prettier --write --no-error-on-unmatched-pattern src tests integration-tests package.json \"tsconfig*.json\""
+    }
+}

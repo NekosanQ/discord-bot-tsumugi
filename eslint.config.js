@@ -112,7 +112,7 @@ export default [
             ...importPlugin.flatConfigs.typescript.settings,
             'import/resolver': {
                 typescript: {
-                    project: ['./apps/*/tsconfig.json']
+                    project: ['./apps/*/tsconfig.json', './packages/*/tsconfig.json']
                 }
             }
         },
