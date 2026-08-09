@@ -2,12 +2,12 @@ import {
     ApplicationCommandDataResolvable,
     ChatInputCommandInteraction,
     Client,
-    Collection,
     Interaction,
     InteractionReplyOptions,
     MessageFlags
 } from 'discord.js';
 
+import type { CooldownStore } from '../application/cooldown/CooldownStore.js';
 import { embeds } from '../utils/EmbedGenerator.js';
 import { logger } from '../utils/log.js';
 import { IActionInteraction } from './base/action_base.js';
@@ -21,8 +21,6 @@ import { InteractionBase } from './base/interaction_base.js';
 export default class CommandHandler {
     private readonly commandMap = new Map<string, InteractionBase>();
     private readonly actionMap = new Map<string, IActionInteraction>();
-
-    private readonly cooldowns = new Collection<string, Collection<string, number>>();
 
     public readonly commands: InteractionBase[] = [];
     public readonly actions: IActionInteraction[] = [];
@@ -39,7 +37,8 @@ export default class CommandHandler {
     public constructor(
         allInteractions: InteractionBase[],
         private readonly client: Client,
-        private readonly guildId: string
+        private readonly guildId: string,
+        private readonly cooldownStore: CooldownStore
     ) {
         allInteractions.forEach((interaction) => {
             this.registerInteraction(interaction);
@@ -202,16 +201,12 @@ export default class CommandHandler {
     private async isCooldown(interaction: ChatInputCommandInteraction, commandKey: string, cooldownSeconds?: number): Promise<boolean> {
         if (!cooldownSeconds || cooldownSeconds <= 0) return false;
 
-        const timestamps = this.cooldowns.ensure(commandKey, () => new Collection<string, number>());
-
-        const now = Date.now();
         const cooldownAmount = cooldownSeconds * 1000;
         const userId = interaction.user.id;
+        const decision = await this.cooldownStore.acquire({ commandKey, userId }, cooldownAmount);
 
-        const validTimestamp = timestamps.get(userId);
-
-        if (validTimestamp && now < validTimestamp + cooldownAmount) {
-            const expirationTime = validTimestamp + cooldownAmount;
+        if (!decision.acquired) {
+            const expirationTime = Date.now() + decision.retryAfterMs;
             const expiredTimestamp = Math.round(expirationTime / 1000);
 
             const timeLeftEmbed = embeds.error(
@@ -225,12 +220,6 @@ export default class CommandHandler {
             });
             return true;
         }
-
-        timestamps.set(userId, now);
-
-        const cleanupTimer = setTimeout(() => timestamps.delete(userId), cooldownAmount);
-        cleanupTimer.unref();
-
         return false;
     }
 }

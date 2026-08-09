@@ -1,10 +1,17 @@
 import { Client, GatewayIntentBits, Partials } from 'discord.js';
 
+import type { CooldownStore } from '../application/cooldown/CooldownStore.js';
 import CommandHandler from '../commands/CommandHandler.js';
 import { createCommands } from '../commands/index.js';
 import EventHandler from '../events/EventHandler.js';
 import { createEvents } from '../events/events.js';
 import { HttpKeywordManagementClient } from '../infrastructure/api-client/keyword/HttpKeywordManagementClient.js';
+import { InMemoryCooldownStore } from '../infrastructure/cooldown/memory/InMemoryCooldownStore.js';
+import { BotRedisKeyBuilder } from '../infrastructure/cooldown/redis/BotRedisKeyBuilder.js';
+import { RedisCooldownStore } from '../infrastructure/cooldown/redis/RedisCooldownStore.js';
+import { ResilientCooldownStore } from '../infrastructure/cooldown/ResilientCooldownStore.js';
+import { RedisConnection } from '../infrastructure/redis/RedisConnection.js';
+import { RedisMetrics } from '../infrastructure/redis/RedisMetrics.js';
 import CommandService from '../services/CommandService.js';
 import { type Config, initializeConfig, loadConfig, resetConfigAfterFailedInitialization } from '../utils/config.js';
 import { configureLogging, logger, shutdownLogging } from '../utils/log.js';
@@ -14,6 +21,7 @@ import { BotApplication, createApplication } from './createApplication.js';
 export async function createProductionApplication(discordToken: string, apiServiceToken: string): Promise<BotApplication> {
     let clientToCleanUp: Client | undefined;
     let configToReset: Config | undefined;
+    let redisToCleanUp: RedisConnection | undefined;
 
     try {
         configureLogging();
@@ -28,6 +36,29 @@ export async function createProductionApplication(discordToken: string, apiServi
             apiServiceToken,
             applicationConfig.serverManagementApi.timeoutMs
         );
+        const redisMetrics = new RedisMetrics((state): void => {
+            if (state === 'degraded') logger.warn('Bot Redis cooldown state: degraded');
+            if (state === 'ready') logger.info('Bot Redis cooldown state: ready');
+        });
+        const memoryCooldownStore = new InMemoryCooldownStore({ maxEntries: applicationConfig.cooldownStore.maxMemoryEntries });
+        const redisUrl = process.env.BOT_REDIS_URL;
+        let cooldownStore: CooldownStore = memoryCooldownStore;
+        if (redisUrl) {
+            const redisConnection = new RedisConnection({
+                url: redisUrl,
+                connectTimeoutMs: applicationConfig.cooldownStore.connectTimeoutMs,
+                commandTimeoutMs: applicationConfig.cooldownStore.commandTimeoutMs,
+                reconnectBaseDelayMs: applicationConfig.cooldownStore.reconnectBaseDelayMs,
+                reconnectMaxDelayMs: applicationConfig.cooldownStore.reconnectMaxDelayMs,
+                metrics: redisMetrics
+            });
+            redisToCleanUp = redisConnection;
+            cooldownStore = new ResilientCooldownStore(
+                new RedisCooldownStore(redisConnection, new BotRedisKeyBuilder(process.env.NODE_ENV ?? 'development')),
+                memoryCooldownStore,
+                redisMetrics
+            );
+        }
         const client = new Client({
             intents: [
                 GatewayIntentBits.Guilds,
@@ -42,13 +73,16 @@ export async function createProductionApplication(discordToken: string, apiServi
         clientToCleanUp = client;
 
         const commands = createCommands({ keywordManagement });
-        const commandHandler = new CommandHandler(commands, client, applicationConfig.guildId);
+        const commandHandler = new CommandHandler(commands, client, applicationConfig.guildId, cooldownStore);
         CommandService.initialize(commandHandler);
 
         const createdEvents = createEvents({ client, commandHandler, keywordManagement });
         const eventHandler = new EventHandler(createdEvents.events);
 
         return createApplication({
+            startDependencies: (): void => {
+                redisToCleanUp?.start();
+            },
             registerEvents: (): void => {
                 eventHandler.registerEvents(client);
             },
@@ -63,7 +97,13 @@ export async function createProductionApplication(discordToken: string, apiServi
             destroyClient: async (): Promise<void> => {
                 await client.destroy();
             },
-            shutdownDependencies: async (): Promise<void> => Promise.resolve(),
+            shutdownDependencies: async (): Promise<void> => {
+                const snapshot = redisMetrics.snapshot();
+                logger.info(
+                    `Bot Redis cooldown summary: state=${snapshot.state} acquired=${String(snapshot.acquired)} rejected=${String(snapshot.rejected)} fallbacks=${String(snapshot.fallbacks)} timeouts=${String(snapshot.timeouts)}`
+                );
+                await redisToCleanUp?.close();
+            },
             shutdownLogging
         });
     } catch (error) {
@@ -81,6 +121,9 @@ export async function createProductionApplication(discordToken: string, apiServi
             await runCleanup(async (): Promise<void> => {
                 await client.destroy();
             });
+        }
+        if (redisToCleanUp) {
+            await runCleanup((): Promise<void> => redisToCleanUp?.close() ?? Promise.resolve());
         }
         await runCleanup(shutdownLogging);
         if (configToReset) {

@@ -52,6 +52,7 @@ void test('loadConfigは全必須項目を検証して指定環境のTOMLを返�
 
     assert.equal(loaded.guildId, 'guild');
     assert.equal(loaded.statusEmoji.online, 'online');
+    assert.equal(loaded.cooldownStore.commandTimeoutMs, 250);
     assert.equal(loadedPath.endsWith(path.join('config', 'test.toml')), true);
 });
 

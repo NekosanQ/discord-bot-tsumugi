@@ -27,6 +27,13 @@ export interface Config {
         baseUrl: string;
         timeoutMs: number;
     };
+    cooldownStore: {
+        maxMemoryEntries: number;
+        connectTimeoutMs: number;
+        commandTimeoutMs: number;
+        reconnectBaseDelayMs: number;
+        reconnectMaxDelayMs: number;
+    };
 }
 
 export type ConfigLoadFailure = 'not-found' | 'invalid';
@@ -99,6 +106,39 @@ function readServerManagementApi(record: Record<string, unknown>): Config['serve
     return { baseUrl: value.baseUrl, timeoutMs: value.timeoutMs };
 }
 
+function readInteger(record: Record<string, unknown>, key: string, minimum: number): number {
+    const value = record[key];
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < minimum) {
+        throw new TypeError(`コンフィグ項目(${key})は${String(minimum)}以上の整数である必要があります。`);
+    }
+    return value;
+}
+
+function readCooldownStore(record: Record<string, unknown>): Config['cooldownStore'] {
+    const value = record.cooldownStore;
+    if (value === undefined) {
+        return {
+            maxMemoryEntries: 100000,
+            connectTimeoutMs: 500,
+            commandTimeoutMs: 250,
+            reconnectBaseDelayMs: 100,
+            reconnectMaxDelayMs: 5000
+        };
+    }
+    if (!isRecord(value)) throw new TypeError('コンフィグ項目(cooldownStore)はtableである必要があります。');
+    const parsed = {
+        maxMemoryEntries: readInteger(value, 'maxMemoryEntries', 1),
+        connectTimeoutMs: readInteger(value, 'connectTimeoutMs', 1),
+        commandTimeoutMs: readInteger(value, 'commandTimeoutMs', 1),
+        reconnectBaseDelayMs: readInteger(value, 'reconnectBaseDelayMs', 1),
+        reconnectMaxDelayMs: readInteger(value, 'reconnectMaxDelayMs', 1)
+    };
+    if (parsed.reconnectMaxDelayMs < parsed.reconnectBaseDelayMs) {
+        throw new TypeError('cooldownStore.reconnectMaxDelayMsはreconnectBaseDelayMs以上である必要があります。');
+    }
+    return parsed;
+}
+
 function parseConfig(value: unknown): Config {
     if (!isRecord(value)) {
         throw new TypeError('コンフィグのrootはtableである必要があります。');
@@ -131,7 +171,8 @@ function parseConfig(value: unknown): Config {
             'lockedStage',
             'category'
         ]),
-        serverManagementApi: readServerManagementApi(value)
+        serverManagementApi: readServerManagementApi(value),
+        cooldownStore: readCooldownStore(value)
     };
 
     if (!configValue.guildId.trim()) {

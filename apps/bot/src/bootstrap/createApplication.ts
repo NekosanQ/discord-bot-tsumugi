@@ -1,4 +1,5 @@
 export interface ApplicationDependencies {
+    startDependencies: () => void | Promise<void>;
     registerEvents: () => void;
     unregisterEvents: () => void;
     stopBackgroundTasks: () => void;
@@ -102,6 +103,7 @@ export function createApplication(dependencies: ApplicationDependencies, options
         state = 'starting';
         startPromise = (async (): Promise<void> => {
             try {
+                await dependencies.startDependencies();
                 dependencies.registerEvents();
                 await dependencies.login();
                 if (!shutdownInProgress()) {

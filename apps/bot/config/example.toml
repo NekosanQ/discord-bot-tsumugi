@@ -47,3 +47,10 @@ category = ""
 [serverManagementApi]
 baseUrl = "http://api:3000"
 timeoutMs = 3000
+
+[cooldownStore]
+maxMemoryEntries = 100000
+connectTimeoutMs = 500
+commandTimeoutMs = 250
+reconnectBaseDelayMs = 100
+reconnectMaxDelayMs = 5000

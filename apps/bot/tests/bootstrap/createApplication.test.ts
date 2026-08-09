@@ -5,6 +5,9 @@ import { ApplicationCleanupTimeoutError, type ApplicationDependencies, createApp
 
 function createDependencies(calls: string[], overrides: Partial<ApplicationDependencies> = {}): ApplicationDependencies {
     const dependencies: ApplicationDependencies = {
+        startDependencies: (): void => {
+            calls.push('startDependencies');
+        },
         registerEvents: (): void => {
             calls.push('registerEvents');
         },
@@ -44,10 +47,11 @@ void test('startとstopは並行・重複呼び出しでも各処理を一度だ
     const application = createApplication(createDependencies(calls));
 
     await Promise.all([application.start(), application.start()]);
-    assert.deepEqual(calls, ['registerEvents', 'login']);
+    assert.deepEqual(calls, ['startDependencies', 'registerEvents', 'login']);
 
     await Promise.all([application.stop(), application.stop()]);
     assert.deepEqual(calls, [
+        'startDependencies',
         'registerEvents',
         'login',
         'unregisterEvents',
@@ -73,6 +77,7 @@ void test('login失敗時も全resourceを後始末して元のerrorを返す', 
 
     await assert.rejects(application.start(), (error: unknown): boolean => error === loginError);
     assert.deepEqual(calls, [
+        'startDependencies',
         'registerEvents',
         'login',
         'unregisterEvents',
@@ -148,6 +153,9 @@ void test('login中のstopはlogin確定後にresourceを解放し、再起動�
     );
 
     const startPromise = application.start();
+    await new Promise<void>((resolve) => {
+        setImmediate(resolve);
+    });
     assert.ok(resolveLogin);
 
     const stopPromise = application.stop();
