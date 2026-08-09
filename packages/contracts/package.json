@@ -1,0 +1,21 @@
+{
+    "name": "@tsumugi/contracts",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "main": "dist/index.js",
+    "types": "src/index.ts",
+    "exports": {
+        ".": {
+            "types": "./src/index.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "scripts": {
+        "compile": "tsc -p tsconfig.build.json",
+        "typecheck": "tsc --noEmit -p tsconfig.json",
+        "test:unit": "tsx --test \"tests/**/*.test.ts\"",
+        "check": "npm run lint:prettier && npm run typecheck && npm run test:unit",
+        "lint:prettier": "prettier --check src tests package.json \"tsconfig*.json\""
+    }
+}
