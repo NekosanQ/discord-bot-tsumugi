@@ -26,13 +26,13 @@ jobs:
               run: npm ci
 
             - name: Generate Prisma Client
-              run: npx prisma generate
+              run: npm run prisma:generate --workspace apps/bot
 
-            - name: Check source and unit tests
+            - name: Check monorepo and Bot unit tests
               run: npm run check
 
-            - name: Run integration tests
-              run: npm run test:integration
+            - name: Run Bot integration tests
+              run: npm run test:integration --workspace apps/bot
 
-            - name: Compile production output
-              run: npm run compile
+            - name: Compile Bot production output
+              run: npm run compile --workspace apps/bot
