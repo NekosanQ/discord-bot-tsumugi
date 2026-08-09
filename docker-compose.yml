@@ -3,6 +3,7 @@ services:
     restart: always
     build:
       context: .
+      dockerfile: apps/bot/Dockerfile
       target: development
     container_name: discord-bot-tsumugi-dev
     env_file:
@@ -12,17 +13,17 @@ services:
       - TZ=Asia/Tokyo
     volumes:
       - type: bind
-        source: ./src
-        target: /app/src
+        source: ./apps/bot/src
+        target: /app/apps/bot/src
       - type: bind
-        source: ./prisma
-        target: /app/prisma
+        source: ./apps/bot/prisma
+        target: /app/apps/bot/prisma
       - type: bind
-        source: ./config
-        target: /app/config
+        source: ./apps/bot/config
+        target: /app/apps/bot/config
       - type: bind
         source: ./logs
-        target: /app/logs
+        target: /app/apps/bot/run
     ports:
       - "5555:5555"
     depends_on:
@@ -34,6 +35,7 @@ services:
     restart: always
     build:
       context: .
+      dockerfile: apps/bot/Dockerfile
       target: production
     container_name: discord-bot-tsumugi-prod
     env_file:
@@ -44,7 +46,7 @@ services:
     volumes:
       - type: bind
         source: ./logs
-        target: /app/logs
+        target: /app/apps/bot/run
     ports:
       - "5555:5555"
     depends_on:
