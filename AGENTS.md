@@ -11,12 +11,12 @@
 
 ## 現状認識
 
-- Stage 2まで完了しており、rootはnpm workspaceの統括、Botは `apps/bot`、サーバー管理APIは `apps/api`、version付きcontractは `packages/contracts` に配置している。`apps/web` はまだ作成していない。
+- Stage 3までローカル実装が完了しており、rootはnpm workspaceの統括、Botは `apps/bot`、サーバー管理APIは `apps/api`、version付きcontractは `packages/contracts` に配置している。`apps/web` はまだ作成していない。実環境のMySQLを含むcache導入前後latencyは未計測であり、配備前に確認する。
 - `apps/bot/src/index.ts` は直接実行時だけproduction bootstrapを起動する。Discord Client、Prisma Client、CommandHandlerの生成は `apps/bot/src/bootstrap/` にあり、下位コードからentrypointへの逆importは依存注入へ置換済みである。
 - `apps/bot/src/commands/` と `apps/bot/src/events/` にはimport時に生成されるシングルトンが多い。既存コードとして当面許容するが、新規・移行済みコードでは増やさない。
 - Prisma schemaとmigrationは `apps/api/prisma/` にあり、APIのPrisma persistence adapterだけが直接accessする。BotへPrisma依存を戻さない。
 - Bot用Dockerfileは `apps/bot/Dockerfile` に置き、build contextはworkspaceのrootとする。
-- キーワード管理と応答解決はBotからservice identity付きHTTP APIを介して行い、APIがMySQLを参照する。クールダウンはまだBotのプロセス内メモリだけで管理している。
+- キーワード管理と応答解決はBotからservice identity付きHTTP APIを介して行い、APIがMySQLを正本としてRedis cache-asideを利用する。Botのcommand cooldownは別Redisで原子的に共有し、障害時は上限付きin-memoryへ縮退する。
 - 既存Channelのguild所有列はexpand migrationのためnullableであり、認証済みBotからの初回アクセス時だけguildへ紐付ける。別guildへの再紐付けはconflictとして拒否する。全既存行のbackfillを確認するまで非null化しない。
 - Node標準test runner、unit/integration script、GitHub Actionsの静的検証をStage 0の安全網として導入済みである。静的検証の成功をDiscord、MySQL、Dockerなどの実環境確認の成功として報告しない。
 - 移行中は旧構成と新構成の共存を許容する。ただし、同じユースケースに複数の書込経路を作らない。
@@ -149,7 +149,7 @@ docker-compose.yml                  # 開発・運用サービスの構成
 - version管理されたAPI contractとHTTP adapterを追加し、BotのDiscord command、modal、message eventをAPI clientへ切り替える。
 - Botの直接Prisma accessを廃止してからPrisma依存とmigration責任を `apps/api` へ移し、`migrate deploy` はAPI所有の単一deploy jobで一度だけ実行する。
 
-### Stage 3: Redisを補助インフラとして導入する
+### Stage 3: Redisを補助インフラとして導入する（2026-08-10ローカル実装完了）
 
 - APIに `KeywordLookupCache`、Botに `CooldownStore` portを定義し、それぞれin-memory実装、Redis実装の順に追加する。
 - APIのキーワード参照へcache-asideを導入し、Botの複数processで必要なcooldownを原子的に共有する。
