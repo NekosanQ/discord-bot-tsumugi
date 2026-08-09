@@ -2,12 +2,11 @@ import { ChatInputCommandInteraction, ModalBuilder, PermissionsBitField } from '
 
 import CustomSlashSubcommandBuilder from '../../utils/CustomSlashSubCommandBuilder.js';
 import { CommandGroupInteraction, SubCommandInteraction } from '../base/command_base.js';
-import keywordAddModal from './action/KeywordAddModal.js';
-import keywordCommandGroup from './KeywordCommandGroup.js';
+import { KeywordAddModal } from './action/KeywordAddModal.js';
 /**
  * キーワード登録/更新コマンド
  */
-class KeywordAddCommand extends SubCommandInteraction {
+export class KeywordAddCommand extends SubCommandInteraction {
     public command: CustomSlashSubcommandBuilder = new CustomSlashSubcommandBuilder()
         .setName('add')
         .setDescription('キーワードを登録/更新します。')
@@ -15,8 +14,11 @@ class KeywordAddCommand extends SubCommandInteraction {
         .setUsage('`/keyword add`')
         .setDefaultBotPermissions(PermissionsBitField.Flags.ManageGuild);
 
-    public constructor() {
-        super(keywordCommandGroup as CommandGroupInteraction);
+    public constructor(
+        registry: CommandGroupInteraction,
+        private readonly keywordAddModal: KeywordAddModal
+    ) {
+        super(registry);
     }
 
     protected override shouldDeferReply(): boolean {
@@ -24,9 +26,7 @@ class KeywordAddCommand extends SubCommandInteraction {
     }
     /** @inheritdoc */
     public async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-        const modal: ModalBuilder = keywordAddModal.create();
+        const modal: ModalBuilder = this.keywordAddModal.create();
         await interaction.showModal(modal);
     }
 }
-
-export default new KeywordAddCommand();

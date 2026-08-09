@@ -2,7 +2,7 @@ import { Client, ClientEvents } from 'discord.js';
 
 import { EventBase } from './base/event_base.js';
 
-type AnyEventBase = {
+export type AnyEventBase = {
     [K in keyof ClientEvents]: EventBase<K>;
 }[keyof ClientEvents];
 
@@ -24,5 +24,17 @@ export default class EventHandler {
         this._events.forEach((event) => {
             event.register(client);
         });
+    }
+
+    /** 登録済みの全イベントlistenerを解除する */
+    public unregisterEvents(): void {
+        this._events.forEach((event) => {
+            event.unregister();
+        });
+    }
+
+    /** 登録解除時点ですでに実行中だったlistenerを待つ */
+    public async waitForIdle(): Promise<void> {
+        await Promise.all(this._events.map((event): Promise<void> => event.waitForIdle()));
     }
 }

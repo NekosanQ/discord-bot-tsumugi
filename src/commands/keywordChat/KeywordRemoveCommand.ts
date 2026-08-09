@@ -1,15 +1,14 @@
+import { PrismaClient } from '@prisma/client';
 import { ChatInputCommandInteraction, MessageFlags } from 'discord.js';
 
-import { prisma } from '../../index.js';
 import CustomSlashSubcommandBuilder from '../../utils/CustomSlashSubCommandBuilder.js';
 import { logger } from '../../utils/log.js';
-import { SubCommandInteraction } from '../base/command_base.js';
-import keywordCommandGroup from './KeywordCommandGroup.js';
+import { CommandGroupInteraction, SubCommandInteraction } from '../base/command_base.js';
 
 /**
  * キーワード削除コマンド
  */
-class KeywordRemoveCommand extends SubCommandInteraction {
+export class KeywordRemoveCommand extends SubCommandInteraction {
     public command = new CustomSlashSubcommandBuilder()
         .setName('remove')
         .setDescription('登録されているキーワードを削除します。')
@@ -19,8 +18,11 @@ class KeywordRemoveCommand extends SubCommandInteraction {
             option.setName('keyword').setDescription('削除するキーワードを指定します。').setRequired(true)
         ) as CustomSlashSubcommandBuilder;
 
-    public constructor() {
-        super(keywordCommandGroup);
+    public constructor(
+        registry: CommandGroupInteraction,
+        private readonly prisma: PrismaClient
+    ) {
+        super(registry);
     }
 
     /** @inheritdoc */
@@ -33,7 +35,7 @@ class KeywordRemoveCommand extends SubCommandInteraction {
                 await interaction.reply({ content: 'チャンネル情報が取得できませんでした。', flags: MessageFlags.Ephemeral });
                 return;
             }
-            await prisma.keyword.delete({
+            await this.prisma.keyword.delete({
                 where: {
                     // eslint-disable-next-line @typescript-eslint/naming-convention
                     channelId_trigger: {
@@ -49,5 +51,3 @@ class KeywordRemoveCommand extends SubCommandInteraction {
         }
     }
 }
-
-export default new KeywordRemoveCommand();

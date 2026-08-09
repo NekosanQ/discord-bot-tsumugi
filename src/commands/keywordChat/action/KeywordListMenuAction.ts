@@ -1,6 +1,6 @@
+import { PrismaClient } from '@prisma/client';
 import { ComponentType, MessageFlags, StringSelectMenuBuilder, StringSelectMenuInteraction } from 'discord.js';
 
-import { prisma } from '../../../index.js';
 import { embeds } from '../../../utils/EmbedGenerator.js';
 import { MessageComponentActionInteraction } from '../../base/action_base.js';
 import keywordEmbed from '../KeywordEmbed.js';
@@ -8,8 +8,8 @@ import keywordEmbed from '../KeywordEmbed.js';
 /**
  * キーワード一覧のページネーションメニューの作成と処理を行う
  */
-class KeywordListMenuAction extends MessageComponentActionInteraction<ComponentType.StringSelect> {
-    public constructor() {
+export class KeywordListMenuAction extends MessageComponentActionInteraction<ComponentType.StringSelect> {
+    public constructor(private readonly prisma: PrismaClient) {
         super('keyword_list_page', ComponentType.StringSelect);
     }
 
@@ -43,7 +43,7 @@ class KeywordListMenuAction extends MessageComponentActionInteraction<ComponentT
             return;
         }
 
-        const prismaKeywordsRaw = await prisma.keyword.findMany({
+        const prismaKeywordsRaw = await this.prisma.keyword.findMany({
             where: { channelId: channelId },
             orderBy: { trigger: 'asc' }
         });
@@ -79,5 +79,3 @@ class KeywordListMenuAction extends MessageComponentActionInteraction<ComponentT
         await interaction.update({ embeds: [targetEmbed] });
     }
 }
-
-export default new KeywordListMenuAction();

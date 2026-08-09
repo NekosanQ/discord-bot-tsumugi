@@ -5,28 +5,52 @@ import log4js from 'log4js';
 
 import { getWorkdirPath } from './workdir.js';
 
-/**
- * log4jsの設定
- */
-log4js.configure({
-    appenders: {
-        file: {
-            type: 'file',
-            filename: getWorkdirPath('bot.log'),
-            maxLogSize: 10 * 1024 * 1024,
-            backups: 3
+let loggingConfigured = false;
+
+/** log4jsをproduction bootstrapから明示的に設定する */
+export function configureLogging(): void {
+    if (loggingConfigured) return;
+
+    log4js.configure({
+        appenders: {
+            file: {
+                type: 'file',
+                filename: getWorkdirPath('bot.log'),
+                maxLogSize: 10 * 1024 * 1024,
+                backups: 3
+            },
+            console: {
+                type: 'console'
+            }
         },
-        console: {
-            type: 'console'
+        categories: {
+            default: {
+                appenders: ['file', 'console'],
+                level: 'info'
+            }
         }
-    },
-    categories: {
-        default: {
-            appenders: ['file', 'console'],
-            level: 'info'
-        }
+    });
+    loggingConfigured = true;
+}
+
+/** バッファ中のログを書き出してloggerを終了する */
+export async function shutdownLogging(): Promise<void> {
+    if (!loggingConfigured) return;
+
+    try {
+        await new Promise<void>((resolve, reject) => {
+            log4js.shutdown((error?: Error): void => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+                resolve();
+            });
+        });
+    } finally {
+        loggingConfigured = false;
     }
-});
+}
 
 /**
  * アプリケーションのログ出力を管理するクラス

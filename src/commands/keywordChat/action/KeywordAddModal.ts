@@ -1,6 +1,6 @@
+import { PrismaClient } from '@prisma/client';
 import { ActionRowBuilder, MessageFlags, ModalBuilder, ModalSubmitInteraction, TextInputBuilder, TextInputStyle } from 'discord.js';
 
-import { prisma } from '../../../index.js';
 import { embeds } from '../../../utils/EmbedGenerator.js';
 import { logger } from '../../../utils/log.js';
 import { ModalActionInteraction } from '../../base/action_base.js';
@@ -8,8 +8,8 @@ import { ModalActionInteraction } from '../../base/action_base.js';
 /**
  * キーワードを登録するモーダル
  */
-class KeywordAddModal extends ModalActionInteraction {
-    public constructor() {
+export class KeywordAddModal extends ModalActionInteraction {
+    public constructor(private readonly prisma: PrismaClient) {
         super('keyword_add_modal');
     }
     /** @inheritdoc */
@@ -75,12 +75,12 @@ class KeywordAddModal extends ModalActionInteraction {
                 await interaction.reply({ content: 'チャンネル情報が取得できませんでした。', flags: MessageFlags.Ephemeral });
                 return;
             }
-            await prisma.channel.upsert({
+            await this.prisma.channel.upsert({
                 where: { id: channelId },
                 update: {},
                 create: { id: channelId }
             });
-            await prisma.keyword.upsert({
+            await this.prisma.keyword.upsert({
                 where: {
                     // eslint-disable-next-line @typescript-eslint/naming-convention
                     channelId_trigger: {
@@ -112,5 +112,3 @@ class KeywordAddModal extends ModalActionInteraction {
         }
     }
 }
-
-export default new KeywordAddModal();

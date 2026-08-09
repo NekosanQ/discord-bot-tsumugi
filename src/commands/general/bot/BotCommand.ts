@@ -20,7 +20,7 @@ class BotCommand extends CommandInteraction {
 
     protected async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
         try {
-            const botInfo = BotInfoService.getBotInfo();
+            const botInfo = BotInfoService.getBotInfo(interaction.client);
 
             const embed = BotEmbed.create(interaction, botInfo);
             const components = BotComponents.createActionRow();

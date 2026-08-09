@@ -1,34 +1,47 @@
-import { ActivityType } from 'discord.js';
+import { ActivityType, type Client } from 'discord.js';
 
-import { client, commandHandler } from '../index.js';
+import CommandHandler from '../commands/CommandHandler.js';
 import { logger } from '../utils/log.js';
 import { EventBase } from './base/event_base.js';
 
-class ClientReadyEvent extends EventBase<'clientReady'> {
+export class ClientReadyEvent extends EventBase<'clientReady'> {
     public eventName = 'clientReady' as const;
     public static totalGuilds = '情報取得中...';
     public static totalUsers = '情報取得中...';
-    private updateInterval = 15000;
+    private readonly updateInterval = 15000;
+    private updateTimer: NodeJS.Timeout | undefined;
+    private stopped = false;
+
+    public constructor(
+        private readonly client: Client,
+        private readonly commandHandler: CommandHandler
+    ) {
+        super();
+    }
 
     public async listener(): Promise<void> {
+        this.stop();
+        this.stopped = false;
         try {
-            await commandHandler.registerCommands();
+            await this.commandHandler.registerCommands();
             this.updateStatsAndActivity();
             this.startUpdateLoop();
-            logger.info(`起動完了: ${client.user?.tag ?? 'Unknown User'}`);
+            logger.info(`起動完了: ${this.client.user?.tag ?? 'Unknown User'}`);
         } catch (error) {
             logger.error('ClientReadyEventでエラーが発生', error);
         }
     }
 
     private startUpdateLoop(): void {
+        if (this.stopped) return;
+
         ((): void => {
             try {
                 this.updateStatsAndActivity();
             } catch (error) {
                 logger.error('ステータスの定期更新中にエラーが発生', error);
             } finally {
-                setTimeout(() => {
+                this.updateTimer = setTimeout(() => {
                     this.startUpdateLoop();
                 }, this.updateInterval);
             }
@@ -41,16 +54,23 @@ class ClientReadyEvent extends EventBase<'clientReady'> {
 
         const name = `/help | Servers: ${ClientReadyEvent.totalGuilds} | Users: ${ClientReadyEvent.totalUsers}`;
 
-        client.user?.setActivity({ name, type: ActivityType.Playing });
+        this.client.user?.setActivity({ name, type: ActivityType.Playing });
     }
 
     public checkTotalGuilds(): string {
-        return client.guilds.cache.size.toString();
+        return this.client.guilds.cache.size.toString();
     }
 
     public checkTotalUsers(): string {
-        return client.guilds.cache.reduce((sum, guild) => sum + guild.memberCount, 0).toString();
+        return this.client.guilds.cache.reduce((sum, guild) => sum + guild.memberCount, 0).toString();
+    }
+
+    /** 定期更新を停止する */
+    public stop(): void {
+        this.stopped = true;
+        if (this.updateTimer) {
+            clearTimeout(this.updateTimer);
+            this.updateTimer = undefined;
+        }
     }
 }
-
-export default new ClientReadyEvent();

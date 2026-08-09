@@ -6,7 +6,7 @@ import { CommandGroupInteraction } from '../base/command_base.js';
 /**
  * キーワード応答機能に関するコマンドグループ
  */
-class KeywordCommandGroup extends CommandGroupInteraction {
+export class KeywordCommandGroup extends CommandGroupInteraction {
     public command = new CustomSlashCommandBuilder()
         .setName('keyword')
         .setDescription('キーワード応答機能に関する設定を行います')
@@ -15,5 +15,3 @@ class KeywordCommandGroup extends CommandGroupInteraction {
         .setCooldown(5)
         .setContexts(InteractionContextType.Guild);
 }
-
-export default new KeywordCommandGroup();

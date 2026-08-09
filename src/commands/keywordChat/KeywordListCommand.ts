@@ -1,15 +1,14 @@
+import { PrismaClient } from '@prisma/client';
 import { ActionRowBuilder, ChatInputCommandInteraction, StringSelectMenuBuilder } from 'discord.js';
 
-import { prisma } from '../../index.js';
 import CustomSlashSubcommandBuilder from '../../utils/CustomSlashSubCommandBuilder.js';
-import { SubCommandInteraction } from '../base/command_base.js';
-import keywordListMenuAction from './action/KeywordListMenuAction.js';
-import keywordCommandGroup from './KeywordCommandGroup.js';
+import { CommandGroupInteraction, SubCommandInteraction } from '../base/command_base.js';
+import { KeywordListMenuAction } from './action/KeywordListMenuAction.js';
 import keywordEmbed from './KeywordEmbed.js';
 /**
  * キーワード一覧表示コマンド
  */
-class KeywordListCommand extends SubCommandInteraction {
+export class KeywordListCommand extends SubCommandInteraction {
     public command = new CustomSlashSubcommandBuilder()
         .setName('list')
         .setDescription('登録されているキーワードの一覧、または指定したキーワードの応答を表示します。')
@@ -19,8 +18,12 @@ class KeywordListCommand extends SubCommandInteraction {
             option.setName('keyword').setDescription('応答を表示するキーワードを指定します。').setRequired(false)
         ) as CustomSlashSubcommandBuilder;
 
-    public constructor() {
-        super(keywordCommandGroup);
+    public constructor(
+        registry: CommandGroupInteraction,
+        private readonly prisma: PrismaClient,
+        private readonly keywordListMenuAction: KeywordListMenuAction
+    ) {
+        super(registry);
     }
 
     /** @inheritdoc */
@@ -41,7 +44,7 @@ class KeywordListCommand extends SubCommandInteraction {
     private async showList(interaction: ChatInputCommandInteraction): Promise<void> {
         const channelId = interaction.channel?.id;
 
-        const prismaKeywords = await prisma.keyword.findMany({
+        const prismaKeywords = await this.prisma.keyword.findMany({
             where: { channelId: channelId },
             orderBy: { trigger: 'asc' }
         });
@@ -75,7 +78,7 @@ class KeywordListCommand extends SubCommandInteraction {
             return;
         }
 
-        const menu = await keywordListMenuAction.create(embeds.length);
+        const menu = await this.keywordListMenuAction.create(embeds.length);
         const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu);
 
         await interaction.editReply({
@@ -88,7 +91,7 @@ class KeywordListCommand extends SubCommandInteraction {
      * 指定されたキーワードの応答メッセージを表示します。
      */
     private async showResponses(interaction: ChatInputCommandInteraction, trigger: string): Promise<void> {
-        const keyword = await prisma.keyword.findFirst({
+        const keyword = await this.prisma.keyword.findFirst({
             where: {
                 channelId: interaction.channel?.id,
                 trigger: trigger
@@ -121,5 +124,3 @@ class KeywordListCommand extends SubCommandInteraction {
         await interaction.editReply({ embeds: [embed] });
     }
 }
-
-export default new KeywordListCommand();

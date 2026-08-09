@@ -1,14 +1,18 @@
+import { PrismaClient } from '@prisma/client';
 import { Message, TextChannel } from 'discord.js';
 
-import { prisma } from '../index.js';
 import { logger } from '../utils/log.js';
 import { EventBase } from './base/event_base.js';
 
 /**
  * messageCreateイベントを処理するクラス
  */
-class MessageCreateEvent extends EventBase<'messageCreate'> {
+export class MessageCreateEvent extends EventBase<'messageCreate'> {
     public eventName = 'messageCreate' as const;
+
+    public constructor(private readonly prisma: PrismaClient) {
+        super();
+    }
 
     public async listener(message: Message): Promise<void> {
         if (message.author.bot || !message.guild) return;
@@ -21,7 +25,7 @@ class MessageCreateEvent extends EventBase<'messageCreate'> {
         if (message.content.length > MAX_MESSAGE_LENGTH) return;
 
         try {
-            const keywords = await prisma.keyword.findMany({
+            const keywords = await this.prisma.keyword.findMany({
                 where: {
                     channelId: message.channel.id
                 }
@@ -42,5 +46,3 @@ class MessageCreateEvent extends EventBase<'messageCreate'> {
         }
     }
 }
-
-export default new MessageCreateEvent();

@@ -1,14 +1,13 @@
 import {
     ApplicationCommandDataResolvable,
     ChatInputCommandInteraction,
+    Client,
     Collection,
     Interaction,
     InteractionReplyOptions,
     MessageFlags
 } from 'discord.js';
 
-import { client } from '../index.js';
-import { config } from '../utils/config.js';
 import { embeds } from '../utils/EmbedGenerator.js';
 import { logger } from '../utils/log.js';
 import { IActionInteraction } from './base/action_base.js';
@@ -37,7 +36,11 @@ export default class CommandHandler {
      * コマンドハンドラーを初期化する
      * @param allInteractions 全インタラクションのリスト
      */
-    public constructor(allInteractions: InteractionBase[] = []) {
+    public constructor(
+        allInteractions: InteractionBase[],
+        private readonly client: Client,
+        private readonly guildId: string
+    ) {
         allInteractions.forEach((interaction) => {
             this.registerInteraction(interaction);
         });
@@ -52,7 +55,7 @@ export default class CommandHandler {
      */
     public async registerCommands(): Promise<void> {
         try {
-            const guild = await client.guilds.fetch(config.guildId);
+            const guild = await this.client.guilds.fetch(this.guildId);
             const applicationCommands: ApplicationCommandDataResolvable[] = [];
 
             this.commands.forEach((command) => {
@@ -225,7 +228,8 @@ export default class CommandHandler {
 
         timestamps.set(userId, now);
 
-        setTimeout(() => timestamps.delete(userId), cooldownAmount);
+        const cleanupTimer = setTimeout(() => timestamps.delete(userId), cooldownAmount);
+        cleanupTimer.unref();
 
         return false;
     }
