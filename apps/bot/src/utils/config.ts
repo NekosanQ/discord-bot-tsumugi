@@ -23,6 +23,10 @@ export interface Config {
     gifEmoji: string;
     statusEmoji: Record<string, string>;
     channelEmoji: Record<string, string>;
+    serverManagementApi: {
+        baseUrl: string;
+        timeoutMs: number;
+    };
 }
 
 export type ConfigLoadFailure = 'not-found' | 'invalid';
@@ -82,6 +86,19 @@ function readStringRecord(record: Record<string, unknown>, key: string, required
     return parsed;
 }
 
+function readServerManagementApi(record: Record<string, unknown>): Config['serverManagementApi'] {
+    const value = record.serverManagementApi;
+    if (value === undefined) return { baseUrl: 'http://api:3000', timeoutMs: 3000 };
+    if (!isRecord(value) || typeof value.baseUrl !== 'string' || typeof value.timeoutMs !== 'number' || !Number.isInteger(value.timeoutMs)) {
+        throw new TypeError('コンフィグ項目(serverManagementApi)が不正です。');
+    }
+    if (!value.baseUrl.startsWith('http://') && !value.baseUrl.startsWith('https://')) {
+        throw new TypeError('serverManagementApi.baseUrlはHTTP URLである必要があります。');
+    }
+    if (value.timeoutMs < 1) throw new TypeError('serverManagementApi.timeoutMsは1以上である必要があります。');
+    return { baseUrl: value.baseUrl, timeoutMs: value.timeoutMs };
+}
+
 function parseConfig(value: unknown): Config {
     if (!isRecord(value)) {
         throw new TypeError('コンフィグのrootはtableである必要があります。');
@@ -113,7 +130,8 @@ function parseConfig(value: unknown): Config {
             'publicStage',
             'lockedStage',
             'category'
-        ])
+        ]),
+        serverManagementApi: readServerManagementApi(value)
     };
 
     if (!configValue.guildId.trim()) {

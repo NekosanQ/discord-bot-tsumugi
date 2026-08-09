@@ -3,6 +3,7 @@ node_modules/
 run/config.toml
 *.log
 *.env.*
+!.env.*.sample
 .vscode/
 development.toml
 production.toml

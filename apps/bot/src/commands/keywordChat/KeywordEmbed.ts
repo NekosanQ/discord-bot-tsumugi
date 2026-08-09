@@ -2,7 +2,7 @@ import { EmbedBuilder, User } from 'discord.js';
 
 import { embeds } from '../../utils/EmbedGenerator.js';
 
-interface PrismaKeyword {
+interface KeywordView {
     trigger: string;
     responses: string | string[];
 }
@@ -20,7 +20,7 @@ class KeywordEmbed {
      * @param keywords - 表示するキーワードの配列
      * @returns 生成されたEmbedBuilderの配列
      */
-    public createPaginatedTriggerListEmbeds(user: User, keywords: PrismaKeyword[]): EmbedBuilder[] {
+    public createPaginatedTriggerListEmbeds(user: User, keywords: KeywordView[]): EmbedBuilder[] {
         if (keywords.length === 0) {
             return [embeds.info(user).setDescription('このサーバーにはキーワードが登録されていません。')];
         }
@@ -59,7 +59,7 @@ class KeywordEmbed {
      * @param keyword - 表示するキーワードオブジェクト
      * @returns 生成されたEmbedBuilder
      */
-    public createKeywordResponsesEmbed(user: User, keyword: PrismaKeyword): EmbedBuilder {
+    public createKeywordResponsesEmbed(user: User, keyword: KeywordView): EmbedBuilder {
         const responses = Array.isArray(keyword.responses) ? keyword.responses : [keyword.responses];
         const description = responses.map((res) => `- ${res}`).join('\n');
 

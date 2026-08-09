@@ -26,8 +26,8 @@ function createDependencies(calls: string[], overrides: Partial<ApplicationDepen
             calls.push('destroyClient');
             return Promise.resolve();
         },
-        disconnectDatabase: (): Promise<void> => {
-            calls.push('disconnectDatabase');
+        shutdownDependencies: (): Promise<void> => {
+            calls.push('shutdownDependencies');
             return Promise.resolve();
         },
         shutdownLogging: (): Promise<void> => {
@@ -54,7 +54,7 @@ void test('startとstopは並行・重複呼び出しでも各処理を一度だ
         'stopBackgroundTasks',
         'waitForInFlight',
         'destroyClient',
-        'disconnectDatabase',
+        'shutdownDependencies',
         'shutdownLogging'
     ]);
 });
@@ -79,7 +79,7 @@ void test('login失敗時も全resourceを後始末して元のerrorを返す', 
         'stopBackgroundTasks',
         'waitForInFlight',
         'destroyClient',
-        'disconnectDatabase',
+        'shutdownDependencies',
         'shutdownLogging'
     ]);
 
@@ -106,7 +106,7 @@ void test('cleanupの一部が失敗しても残りを続行してAggregateError
         'stopBackgroundTasks',
         'waitForInFlight',
         'destroyClient',
-        'disconnectDatabase',
+        'shutdownDependencies',
         'shutdownLogging'
     ]);
 });
@@ -128,7 +128,7 @@ void test('cleanupがtimeoutしても後続resourceの解放を続ける', async
         application.stop(),
         (error: unknown): boolean => error instanceof AggregateError && error.errors.some((item) => item instanceof ApplicationCleanupTimeoutError)
     );
-    assert.deepEqual(calls.slice(-3), ['destroyClient', 'disconnectDatabase', 'shutdownLogging']);
+    assert.deepEqual(calls.slice(-3), ['destroyClient', 'shutdownDependencies', 'shutdownLogging']);
 });
 
 void test('login中のstopはlogin確定後にresourceを解放し、再起動を拒否する', async (): Promise<void> => {
@@ -159,7 +159,7 @@ void test('login中のstopはlogin確定後にresourceを解放し、再起動�
     resolveLogin();
     await Promise.all([startPromise, stopPromise]);
 
-    assert.deepEqual(calls.slice(-5), ['loginComplete', 'waitForInFlight', 'destroyClient', 'disconnectDatabase', 'shutdownLogging']);
+    assert.deepEqual(calls.slice(-5), ['loginComplete', 'waitForInFlight', 'destroyClient', 'shutdownDependencies', 'shutdownLogging']);
 
     await assert.rejects(application.start(), /現在の状態\(stopped\)ではBotを起動できません。/);
     assert.equal(calls.filter((call) => call === 'unregisterEvents').length, 1);

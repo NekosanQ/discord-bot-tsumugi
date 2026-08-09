@@ -1,6 +1,7 @@
-import { PrismaClient } from '@prisma/client';
 import { ActionRowBuilder, ChatInputCommandInteraction, StringSelectMenuBuilder } from 'discord.js';
 
+import type { KeywordManagement } from '../../application/keyword/KeywordManagement.js';
+import { KeywordApiError } from '../../infrastructure/api-client/keyword/HttpKeywordManagementClient.js';
 import CustomSlashSubcommandBuilder from '../../utils/CustomSlashSubCommandBuilder.js';
 import { CommandGroupInteraction, SubCommandInteraction } from '../base/command_base.js';
 import { KeywordListMenuAction } from './action/KeywordListMenuAction.js';
@@ -20,7 +21,7 @@ export class KeywordListCommand extends SubCommandInteraction {
 
     public constructor(
         registry: CommandGroupInteraction,
-        private readonly prisma: PrismaClient,
+        private readonly keywordManagement: KeywordManagement,
         private readonly keywordListMenuAction: KeywordListMenuAction
     ) {
         super(registry);
@@ -43,34 +44,19 @@ export class KeywordListCommand extends SubCommandInteraction {
      */
     private async showList(interaction: ChatInputCommandInteraction): Promise<void> {
         const channelId = interaction.channel?.id;
+        const guildId = interaction.guildId;
+        if (!channelId || !guildId) {
+            await interaction.editReply('チャンネル情報が取得できませんでした。');
+            return;
+        }
+        const keywords = await this.keywordManagement.list({ guildId, channelId });
 
-        const prismaKeywords = await this.prisma.keyword.findMany({
-            where: { channelId: channelId },
-            orderBy: { trigger: 'asc' }
-        });
-
-        if (prismaKeywords.length === 0) {
+        if (keywords.length === 0) {
             await interaction.editReply('このチャンネルには登録されているキーワードがありません。');
             return;
         }
         // ページ分割されたEmbedの配列を生成
-        const typedKeywords = prismaKeywords.map((k) => {
-            let responsesArray: string[];
-
-            if (Array.isArray(k.responses)) {
-                responsesArray = k.responses.filter((r): r is string => typeof r === 'string');
-            } else if (typeof k.responses === 'string') {
-                responsesArray = [k.responses];
-            } else {
-                responsesArray = [];
-            }
-
-            return {
-                ...k,
-                responses: responsesArray
-            };
-        });
-        const embeds = keywordEmbed.createPaginatedTriggerListEmbeds(interaction.user, typedKeywords);
+        const embeds = keywordEmbed.createPaginatedTriggerListEmbeds(interaction.user, keywords);
         const firstEmbed = embeds[0];
 
         if (embeds.length <= 1) {
@@ -91,36 +77,29 @@ export class KeywordListCommand extends SubCommandInteraction {
      * 指定されたキーワードの応答メッセージを表示します。
      */
     private async showResponses(interaction: ChatInputCommandInteraction, trigger: string): Promise<void> {
-        const keyword = await this.prisma.keyword.findFirst({
-            where: {
-                channelId: interaction.channel?.id,
-                trigger: trigger
+        const channelId = interaction.channel?.id;
+        const guildId = interaction.guildId;
+        if (!channelId || !guildId) {
+            await interaction.editReply('チャンネル情報が取得できませんでした。');
+            return;
+        }
+        let keyword;
+        try {
+            keyword = await this.keywordManagement.get({ guildId, channelId }, trigger);
+        } catch (error) {
+            if (error instanceof KeywordApiError && error.code === 'not_found') {
+                keyword = undefined;
+            } else {
+                throw error;
             }
-        });
+        }
 
         if (!keyword) {
             await interaction.editReply(`キーワード「${trigger}」は見つかりませんでした。`);
             return;
         }
 
-        const typedKeyword = ((): { trigger: string; responses: string[] } => {
-            let responsesArray: string[];
-
-            if (Array.isArray(keyword.responses)) {
-                responsesArray = keyword.responses.filter((r): r is string => typeof r === 'string');
-            } else if (typeof keyword.responses === 'string') {
-                responsesArray = [keyword.responses];
-            } else {
-                responsesArray = [];
-            }
-
-            return {
-                trigger: keyword.trigger,
-                responses: responsesArray
-            };
-        })();
-
-        const embed = keywordEmbed.createKeywordResponsesEmbed(interaction.user, typedKeyword);
+        const embed = keywordEmbed.createKeywordResponsesEmbed(interaction.user, keyword);
         await interaction.editReply({ embeds: [embed] });
     }
 }

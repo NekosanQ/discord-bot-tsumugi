@@ -21,9 +21,13 @@ export async function run(): Promise<void> {
     if (!discordToken?.trim()) {
         throw new Error('DISCORD_TOKENが設定されていません。');
     }
+    const apiServiceToken = process.env.BOT_API_SERVICE_TOKEN;
+    if (!apiServiceToken || apiServiceToken.length < 32) {
+        throw new Error('BOT_API_SERVICE_TOKENは32文字以上で設定してください。');
+    }
 
     const { createProductionApplication } = await import('./bootstrap/createProductionApplication.js');
-    const application: BotApplication = await createProductionApplication(discordToken);
+    const application: BotApplication = await createProductionApplication(discordToken, apiServiceToken);
 
     let shutdownStarted = false;
     const handleSignal = (signal: NodeJS.Signals): void => {

@@ -1,6 +1,6 @@
-import { PrismaClient } from '@prisma/client';
 import { LabelBuilder, MessageFlags, ModalBuilder, ModalSubmitInteraction, TextInputBuilder, TextInputStyle } from 'discord.js';
 
+import type { KeywordManagement } from '../../../application/keyword/KeywordManagement.js';
 import { embeds } from '../../../utils/EmbedGenerator.js';
 import { logger } from '../../../utils/log.js';
 import { ModalActionInteraction } from '../../base/action_base.js';
@@ -9,7 +9,7 @@ import { ModalActionInteraction } from '../../base/action_base.js';
  * キーワードを登録するモーダル
  */
 export class KeywordAddModal extends ModalActionInteraction {
-    public constructor(private readonly prisma: PrismaClient) {
+    public constructor(private readonly keywordManagement: KeywordManagement) {
         super('keyword_add_modal');
     }
     /** @inheritdoc */
@@ -69,32 +69,12 @@ export class KeywordAddModal extends ModalActionInteraction {
 
         try {
             const channelId = interaction.channel?.id;
-            if (!channelId) {
+            const guildId = interaction.guildId;
+            if (!channelId || !guildId) {
                 await interaction.reply({ content: 'チャンネル情報が取得できませんでした。', flags: MessageFlags.Ephemeral });
                 return;
             }
-            await this.prisma.channel.upsert({
-                where: { id: channelId },
-                update: {},
-                create: { id: channelId }
-            });
-            await this.prisma.keyword.upsert({
-                where: {
-                    // eslint-disable-next-line @typescript-eslint/naming-convention
-                    channelId_trigger: {
-                        channelId: channelId,
-                        trigger: trigger
-                    }
-                },
-                update: {
-                    responses: responses
-                },
-                create: {
-                    channelId: channelId,
-                    trigger: trigger,
-                    responses: responses
-                }
-            });
+            await this.keywordManagement.save({ guildId, channelId, trigger, responses });
 
             await interaction.reply({
                 content: `キーワード「${trigger}」を登録しました。`,

@@ -21,7 +21,7 @@
         "test:integration": "npm run test:integration --workspaces --if-present",
         "test": "npm run test --workspaces --if-present",
         "check:architecture": "eslint . --max-warnings=0",
-        "check": "npm run lint:prettier && npm run check:architecture && npm run check --workspaces --if-present",
+        "check": "npm run compile --workspace packages/contracts && npm run lint:prettier && npm run check:architecture && npm run check --workspaces --if-present",
         "prisma:generate": "npm run prisma:generate --workspaces --if-present",
         "prisma:validate": "npm run prisma:validate --workspaces --if-present",
         "gemini": "gemini",

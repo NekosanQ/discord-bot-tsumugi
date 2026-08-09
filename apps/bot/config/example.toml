@@ -44,3 +44,6 @@ lockedAnnouncement = ""
 publicStage = ""
 lockedStage = ""
 category = ""
+[serverManagementApi]
+baseUrl = "http://api:3000"
+timeoutMs = 3000

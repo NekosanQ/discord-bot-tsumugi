@@ -1,6 +1,6 @@
-import { PrismaClient } from '@prisma/client';
 import { Message, TextChannel } from 'discord.js';
 
+import type { KeywordManagement } from '../application/keyword/KeywordManagement.js';
 import { logger } from '../utils/log.js';
 import { EventBase } from './base/event_base.js';
 
@@ -10,7 +10,7 @@ import { EventBase } from './base/event_base.js';
 export class MessageCreateEvent extends EventBase<'messageCreate'> {
     public eventName = 'messageCreate' as const;
 
-    public constructor(private readonly prisma: PrismaClient) {
+    public constructor(private readonly keywordManagement: KeywordManagement) {
         super();
     }
 
@@ -19,27 +19,15 @@ export class MessageCreateEvent extends EventBase<'messageCreate'> {
         await this.validateMessage(message);
     }
     private async validateMessage(message: Message): Promise<void> {
+        if (!message.guildId) return;
         if (message.mentions.users.size > 0 || message.mentions.roles.size > 0 || message.mentions.everyone) return;
 
         const MAX_MESSAGE_LENGTH = 200;
         if (message.content.length > MAX_MESSAGE_LENGTH) return;
 
         try {
-            const keywords = await this.prisma.keyword.findMany({
-                where: {
-                    channelId: message.channel.id
-                }
-            });
-            for (const keyword of keywords) {
-                if (message.content.includes(keyword.trigger)) {
-                    if (Array.isArray(keyword.responses) && keyword.responses.length > 0) {
-                        const responses = keyword.responses as string[];
-                        const response = responses[Math.floor(Math.random() * responses.length)];
-                        await (message.channel as TextChannel).send(response);
-                    }
-                    return;
-                }
-            }
+            const match = await this.keywordManagement.resolve({ guildId: message.guildId, channelId: message.channel.id }, message.content);
+            if (match) await (message.channel as TextChannel).send(match.response);
         } catch (error) {
             logger.error('MessageCreateEventでエラーが発生', error);
             return;

@@ -5,7 +5,7 @@ export interface ApplicationDependencies {
     waitForInFlight: () => Promise<void>;
     login: () => Promise<void>;
     destroyClient: () => Promise<void>;
-    disconnectDatabase: () => Promise<void>;
+    shutdownDependencies: () => Promise<void>;
     shutdownLogging: () => Promise<void>;
 }
 
@@ -73,7 +73,7 @@ export function createApplication(dependencies: ApplicationDependencies, options
             }
             await runCleanup('in-flight event drain', dependencies.waitForInFlight);
             await runCleanup('Discord client destroy', dependencies.destroyClient);
-            await runCleanup('database disconnect', dependencies.disconnectDatabase);
+            await runCleanup('dependency shutdown', dependencies.shutdownDependencies);
             await runCleanup('logger shutdown', dependencies.shutdownLogging);
 
             state = 'stopped';

@@ -1,0 +1,36 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model ManagedGuild {
+  id           String    @id
+  botInstalled Boolean   @default(true)
+  channels     Channel[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Channel {
+  id       String        @id
+  guildId  String?
+  guild    ManagedGuild? @relation(fields: [guildId], references: [id])
+  keywords Keyword[]
+
+  @@index([guildId])
+}
+
+model Keyword {
+  id        Int     @id @default(autoincrement())
+  channelId String
+  trigger   String
+  responses Json
+  channel   Channel @relation(fields: [channelId], references: [id])
+
+  @@unique([channelId, trigger])
+}

@@ -1,5 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
+import type { KeywordManagement } from '../application/keyword/KeywordManagement.js';
 import { InteractionBase } from './base/interaction_base.js';
 import omikujiCommand from './fun/omikuji/OmikujiCommand.js';
 import rpsCommand from './fun/rps/RPCCommand.js';
@@ -20,16 +19,16 @@ import { KeywordListCommand } from './keywordChat/KeywordListCommand.js';
 import { KeywordRemoveCommand } from './keywordChat/KeywordRemoveCommand.js';
 
 export interface CommandFactoryDependencies {
-    prisma: PrismaClient;
+    keywordManagement: KeywordManagement;
 }
 
 export function createCommands(dependencies: CommandFactoryDependencies): InteractionBase[] {
     const keywordCommandGroup = new KeywordCommandGroup();
-    const keywordAddModal = new KeywordAddModal(dependencies.prisma);
-    const keywordListMenuAction = new KeywordListMenuAction(dependencies.prisma);
+    const keywordAddModal = new KeywordAddModal(dependencies.keywordManagement);
+    const keywordListMenuAction = new KeywordListMenuAction(dependencies.keywordManagement);
     const keywordAddCommand = new KeywordAddCommand(keywordCommandGroup, keywordAddModal);
-    const keywordRemoveCommand = new KeywordRemoveCommand(keywordCommandGroup, dependencies.prisma);
-    const keywordListCommand = new KeywordListCommand(keywordCommandGroup, dependencies.prisma, keywordListMenuAction);
+    const keywordRemoveCommand = new KeywordRemoveCommand(keywordCommandGroup, dependencies.keywordManagement);
+    const keywordListCommand = new KeywordListCommand(keywordCommandGroup, dependencies.keywordManagement, keywordListMenuAction);
 
     return [
         pingCommand,

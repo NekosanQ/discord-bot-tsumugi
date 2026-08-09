@@ -29,6 +29,11 @@ export interface ResolveKeywordResponse {
     match: { trigger: string; response: string } | null;
 }
 
+export interface SetGuildInstallationRequest {
+    guildId: string;
+    installed: boolean;
+}
+
 export type ApiErrorCode = 'invalid_request' | 'unauthorized' | 'forbidden' | 'not_found' | 'conflict' | 'dependency_failure' | 'internal_error';
 
 export interface ApiErrorResponse {
@@ -37,6 +42,16 @@ export interface ApiErrorResponse {
         message: string;
     };
 }
+
+const apiErrorCodes: readonly ApiErrorCode[] = [
+    'invalid_request',
+    'unauthorized',
+    'forbidden',
+    'not_found',
+    'conflict',
+    'dependency_failure',
+    'internal_error'
+];
 
 export class ContractValidationError extends Error {
     public constructor(message: string) {
@@ -101,6 +116,12 @@ export function parseResolveKeywordRequest(value: unknown): ResolveKeywordReques
     return { ...parseListKeywordsRequest(record), content: readString(record, 'content') };
 }
 
+export function parseSetGuildInstallationRequest(value: unknown): SetGuildInstallationRequest {
+    const record = readRecord(value);
+    if (typeof record.installed !== 'boolean') throw new ContractValidationError('installedはbooleanである必要があります。');
+    return { guildId: readString(record, 'guildId'), installed: record.installed };
+}
+
 export function parseKeywordListResponse(value: unknown): KeywordListResponse {
     const record = readRecord(value);
     const keywords = record.keywords;
@@ -113,4 +134,12 @@ export function parseResolveKeywordResponse(value: unknown): ResolveKeywordRespo
     if (record.match === null) return { match: null };
     const match = readRecord(record.match);
     return { match: { trigger: readString(match, 'trigger'), response: readString(match, 'response') } };
+}
+
+export function parseApiErrorResponse(value: unknown): ApiErrorResponse {
+    const root = readRecord(value);
+    const error = readRecord(root.error);
+    const code = readString(error, 'code');
+    if (!apiErrorCodes.includes(code as ApiErrorCode)) throw new ContractValidationError('未知のAPI error codeです。');
+    return { error: { code: code as ApiErrorCode, message: readString(error, 'message') } };
 }
