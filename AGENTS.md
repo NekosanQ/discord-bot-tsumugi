@@ -11,12 +11,13 @@
 
 ## 現状認識
 
-- Stage 1まで完了しており、rootはnpm workspaceの統括、既存Botは `apps/bot` の独立packageとして配置している。`apps/api` と `apps/web` はまだ作成していない。
+- Stage 2まで完了しており、rootはnpm workspaceの統括、Botは `apps/bot`、サーバー管理APIは `apps/api`、version付きcontractは `packages/contracts` に配置している。`apps/web` はまだ作成していない。
 - `apps/bot/src/index.ts` は直接実行時だけproduction bootstrapを起動する。Discord Client、Prisma Client、CommandHandlerの生成は `apps/bot/src/bootstrap/` にあり、下位コードからentrypointへの逆importは依存注入へ置換済みである。
 - `apps/bot/src/commands/` と `apps/bot/src/events/` にはimport時に生成されるシングルトンが多い。既存コードとして当面許容するが、新規・移行済みコードでは増やさない。
-- Prisma schemaとmigrationはStage 2のAPI切替までの移行用として `apps/bot/prisma/` に置いている。新しい直接Prisma accessは増やさない。
+- Prisma schemaとmigrationは `apps/api/prisma/` にあり、APIのPrisma persistence adapterだけが直接accessする。BotへPrisma依存を戻さない。
 - Bot用Dockerfileは `apps/bot/Dockerfile` に置き、build contextはworkspaceのrootとする。
-- キーワード応答はメッセージごとにMySQLを参照し、クールダウンはプロセス内メモリだけで管理している。
+- キーワード管理と応答解決はBotからservice identity付きHTTP APIを介して行い、APIがMySQLを参照する。クールダウンはまだBotのプロセス内メモリだけで管理している。
+- 既存Channelのguild所有列はexpand migrationのためnullableであり、認証済みBotからの初回アクセス時だけguildへ紐付ける。別guildへの再紐付けはconflictとして拒否する。全既存行のbackfillを確認するまで非null化しない。
 - Node標準test runner、unit/integration script、GitHub Actionsの静的検証をStage 0の安全網として導入済みである。静的検証の成功をDiscord、MySQL、Dockerなどの実環境確認の成功として報告しない。
 - 移行中は旧構成と新構成の共存を許容する。ただし、同じユースケースに複数の書込経路を作らない。
 
@@ -138,7 +139,7 @@ docker-compose.yml                  # 開発・運用サービスの構成
 - Stage 2までは構造移動後の振る舞いを維持し、新しいレイヤー分割や直接Prisma accessを混ぜない。
 - 空の `apps/api` と `apps/web` は対応stageまで作成しない。
 
-### Stage 2: APIをデータ所有者として抽出する
+### Stage 2: APIをデータ所有者として抽出する（2026-08-10完了）
 
 - 最初に挙動を変えず、trigger、responses、入力制約をdomainへ、Prisma `Json` のdecode・schema検証をinfrastructureへ抽出する。
 - 照合順、transaction、error分類などの仕様変更は上記の構造抽出と別commit・別testにする。
@@ -242,32 +243,32 @@ docker-compose.yml                  # 開発・運用サービスの構成
 - APIのunit/contract testは `apps/api/tests/`、実MySQL・Redis・HTTPを使うtestは `apps/api/integration-tests/` に置く。認証・認可とtenant分離を必須testにする。
 - Webのunit/component testは `apps/web/tests/`、browserを使うend-to-end testは `apps/web/e2e/` に置く。
 
-Windows PowerShellでは、必要に応じて `npm.cmd` と `npx.cmd` を使う。次はStage 1完了後の現行commandである。
+Windows PowerShellでは、必要に応じて `npm.cmd` と `npx.cmd` を使う。次はStage 2完了後の現行commandである。
 
 依存セットアップ時:
 
 ```powershell
 npm.cmd ci
-npm.cmd run prisma:generate --workspace apps/bot
+npm.cmd run prisma:generate --workspace apps/api
 ```
 
 TypeScript変更時:
 
 ```powershell
-npm.cmd run prisma:generate --workspace apps/bot
-npm.cmd run check --workspace apps/bot
+npm.cmd run prisma:generate --workspace apps/api
+npm.cmd run check
 ```
 
-配布物やDocker buildへ影響する場合は `npm.cmd run compile --workspace apps/bot` も実行する。monorepo全体の検査はrootで `npm.cmd run check` を実行する。
+配布物やDocker buildへ影響する場合はrootで `npm.cmd run compile` も実行する。monorepo全体の検査はrootで `npm.cmd run check` を実行する。
 
 Prisma変更時:
 
 ```powershell
-npm.cmd run prisma:validate --workspace apps/bot
+npm.cmd run prisma:validate --workspace apps/api
 ```
 
 - `prisma validate` にはprocess環境の `DATABASE_URL` が必要である。schema検証だけなら接続は行わないため、実値を読まず構文上有効な非秘密placeholderを一時設定してよい。値を表示せず、用意できなければ未実施として報告する。
-- schema整形時は `npx.cmd prisma format --schema apps/bot/prisma/schema.prisma` を実行し、書き換えられた差分を確認する。
+- schema整形時は `npx.cmd prisma format --schema apps/api/prisma/schema.prisma` を実行し、書き換えられた差分を確認する。
 - Stage 1完了後はBotの `check`、`test:unit`、`test:integration`、Stage 2完了後はAPIの `prisma:generate`、`prisma:validate`、`check`、`test:unit`、`test:integration`、Stage 4完了後はWebの `check`、`test`、`e2e` を各workspace scriptとして定義する。rootから `npm.cmd run <script> --workspace apps/<app>` で実行し、この現行command一覧も新pathへ更新する。
 - Compose変更時は `docker compose config --quiet`、必要に応じて対象serviceのbuildとhealthを確認する。
 - Bot変更時は、変更範囲に応じて `npm.cmd run test:unit --workspace apps/bot` と `npm.cmd run test:integration --workspace apps/bot` を実行する。
