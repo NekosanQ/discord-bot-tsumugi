@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { ActionRowBuilder, MessageFlags, ModalBuilder, ModalSubmitInteraction, TextInputBuilder, TextInputStyle } from 'discord.js';
+import { LabelBuilder, MessageFlags, ModalBuilder, ModalSubmitInteraction, TextInputBuilder, TextInputStyle } from 'discord.js';
 
 import { embeds } from '../../../utils/EmbedGenerator.js';
 import { logger } from '../../../utils/log.js';
@@ -16,7 +16,6 @@ export class KeywordAddModal extends ModalActionInteraction {
     public create(): ModalBuilder {
         const keywordInput = new TextInputBuilder()
             .setCustomId('trigger')
-            .setLabel('キーワード')
             .setPlaceholder('例: こんにちは')
             .setMinLength(1)
             .setMaxLength(100)
@@ -25,7 +24,6 @@ export class KeywordAddModal extends ModalActionInteraction {
 
         const responsesInput = new TextInputBuilder()
             .setCustomId('responses')
-            .setLabel('応答メッセージ (改行で複数指定)')
             .setPlaceholder('例:\nやあ！\nどうも！')
             .setMinLength(1)
             .setMaxLength(1000)
@@ -35,9 +33,9 @@ export class KeywordAddModal extends ModalActionInteraction {
         return new ModalBuilder()
             .setCustomId(this.createCustomId())
             .setTitle('キーワードの新規登録')
-            .addComponents(
-                new ActionRowBuilder<TextInputBuilder>().addComponents(keywordInput),
-                new ActionRowBuilder<TextInputBuilder>().addComponents(responsesInput)
+            .addLabelComponents(
+                new LabelBuilder().setLabel('キーワード').setTextInputComponent(keywordInput),
+                new LabelBuilder().setLabel('応答メッセージ (改行で複数指定)').setTextInputComponent(responsesInput)
             );
     }
 

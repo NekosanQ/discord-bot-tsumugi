@@ -35,7 +35,7 @@ export class HelpEmbed {
     public createCommandInfoEmbed(interaction: ChatInputCommandInteraction, commandInfo: CommandInteraction | SubCommandInteraction): EmbedBuilder {
         const {
             name,
-            description = '説明がありません',
+            description,
             category = '未分類',
             usage = '使用方法が設定されていません',
             cooldown = 'なし',

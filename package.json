@@ -1,43 +1,54 @@
 {
-  "name": "discord-bot-tsumugi",
-  "version": "3.0.0",
-  "description": "「可愛くて、楽しい」DiscordBot",
-  "type": "module",
-  "main": "dist/index.js",
-  "scripts": {
-    "start": "node dist/index.js",
-    "dev": "tsx src/index.ts",
-    "compile": "tsc -p .",
-    "gemini": "gemini",
-    "lint:prettier": "prettier --check src",
-    "fix:prettier": "prettier --write src",
-    "lint:eslint": "eslint .",
-    "fix:eslint": "eslint . --fix"
-  },
-  "keywords": [],
-  "author": "NekosanQ",
-  "license": "ISC",
-  "dependencies": {
-    "@prisma/client": "^6.16.2",
-    "discord.js": "^14.22.1",
-    "dotenv": "^16.4.5",
-    "log4js": "^6.9.1",
-    "toml": "^3.0.0"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.35.0",
-    "@google/gemini-cli": "^0.6.1",
-    "@types/node": "^20.14.2",
-    "eslint": "^9.35.0",
-    "eslint-config-prettier": "^9.1.2",
-    "eslint-plugin-import": "^2.32.0",
-    "eslint-plugin-prettier": "^5.5.4",
-    "eslint-plugin-simple-import-sort": "^12.1.1",
-    "prettier": "^3.6.2",
-    "prisma": "^6.14.0",
-    "ts-node": "^10.9.2",
-    "tsx": "^4.20.5",
-    "typescript": "^5.4.5",
-    "typescript-eslint": "^8.44.0"
-  }
+    "name": "discord-bot-tsumugi",
+    "version": "3.0.0",
+    "description": "「可愛くて、楽しい」DiscordBot",
+    "type": "module",
+    "main": "dist/index.js",
+    "engines": {
+        "node": "24.x",
+        "npm": ">=10"
+    },
+    "scripts": {
+        "start": "node dist/index.js",
+        "dev": "tsx src/index.ts",
+        "compile": "tsc -p tsconfig.build.json",
+        "typecheck": "tsc --noEmit -p tsconfig.test.json",
+        "test:unit": "tsx --test \"tests/**/*.test.ts\"",
+        "test:integration": "tsx --test --test-concurrency=1 \"integration-tests/**/*.test.ts\"",
+        "test": "npm run test:unit && npm run test:integration",
+        "check:architecture": "eslint . --max-warnings=0",
+        "check": "npm run lint:prettier && npm run check:architecture && npm run typecheck && npm run test:unit",
+        "gemini": "gemini",
+        "lint:prettier": "prettier --check --no-error-on-unmatched-pattern src tests AGENTS.md README.md docs .github package.json \"tsconfig*.json\" eslint.config.js",
+        "fix:prettier": "prettier --write --no-error-on-unmatched-pattern src tests AGENTS.md README.md docs .github package.json \"tsconfig*.json\" eslint.config.js",
+        "lint:eslint": "eslint .",
+        "fix:eslint": "eslint . --fix"
+    },
+    "keywords": [],
+    "author": "NekosanQ",
+    "license": "ISC",
+    "dependencies": {
+        "@prisma/client": "^6.19.3",
+        "discord.js": "^14.27.0",
+        "dotenv": "^16.4.5",
+        "log4js": "^6.9.1",
+        "toml": "^3.0.0"
+    },
+    "devDependencies": {
+        "@eslint/js": "^9.35.0",
+        "@google/gemini-cli": "^0.6.1",
+        "@types/node": "^24.13.3",
+        "eslint": "^9.35.0",
+        "eslint-config-prettier": "^9.1.2",
+        "eslint-import-resolver-typescript": "^4.4.4",
+        "eslint-plugin-import": "^2.32.0",
+        "eslint-plugin-prettier": "^5.5.4",
+        "eslint-plugin-simple-import-sort": "^12.1.1",
+        "prettier": "^3.6.2",
+        "prisma": "^6.19.3",
+        "ts-node": "^10.9.2",
+        "tsx": "^4.20.5",
+        "typescript": "^5.4.5",
+        "typescript-eslint": "^8.66.0"
+    }
 }

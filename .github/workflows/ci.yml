@@ -1,0 +1,38 @@
+name: CI
+
+on:
+    push:
+    pull_request:
+
+permissions:
+    contents: read
+
+jobs:
+    verify:
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version-file: .nvmrc
+                  cache: npm
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Generate Prisma Client
+              run: npx prisma generate
+
+            - name: Check source and unit tests
+              run: npm run check
+
+            - name: Run integration tests
+              run: npm run test:integration
+
+            - name: Compile production output
+              run: npm run compile

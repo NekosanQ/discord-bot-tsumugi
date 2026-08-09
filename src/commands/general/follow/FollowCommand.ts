@@ -18,7 +18,7 @@ class FollowCommand extends CommandInteraction {
 
     protected async onCommand(interaction: ChatInputCommandInteraction): Promise<void> {
         const announcementChannel = await interaction.client.channels.fetch(config.announcementChannelId);
-        if (announcementChannel && announcementChannel.type == ChannelType.GuildAnnouncement) {
+        if (announcementChannel?.type === ChannelType.GuildAnnouncement) {
             const channelId = interaction.channel?.id;
             if (!channelId) return;
             await announcementChannel.addFollower(channelId);
