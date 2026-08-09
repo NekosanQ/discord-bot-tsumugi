@@ -7,4 +7,6 @@ void test('環境別configがない場合は非秘密のexample設定へfallback
     const config = loadApiConfig(process.cwd(), 'missing-test-environment');
     assert.equal(config.port, 3000);
     assert.equal(config.requestTimeoutMs, 5000);
+    assert.equal(config.keywordCache.ttlMs, 60000);
+    assert.equal(config.keywordCache.commandTimeoutMs, 250);
 });

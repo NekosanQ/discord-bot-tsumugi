@@ -3,3 +3,11 @@ port = 3000
 requestBodyLimitBytes = 16384
 requestTimeoutMs = 5000
 shutdownTimeoutMs = 10000
+
+[keywordCache]
+ttlMs = 60000
+maxMemoryEntries = 1000
+connectTimeoutMs = 500
+commandTimeoutMs = 250
+reconnectBaseDelayMs = 100
+reconnectMaxDelayMs = 5000

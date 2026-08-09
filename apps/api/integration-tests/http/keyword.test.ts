@@ -51,6 +51,8 @@ void test('service認証されたHTTP経路でKeywordを保存して解決する
         serviceToken: token,
         requestBodyLimitBytes: 16_384,
         readiness: (): Promise<boolean> => Promise.resolve(true),
+        optionalHealth: (): Promise<Record<string, unknown>> => Promise.resolve({ keywordCache: 'disabled' }),
+        metrics: (): Promise<string> => Promise.resolve('tsumugi_api_redis_up 0\n'),
         reportError: (): void => undefined
     });
     const server = createServer((request, response): void => void handler(request, response));
@@ -70,6 +72,18 @@ void test('service認証されたHTTP経路でKeywordを保存して解決する
             headers: anonymousHeaders
         });
         assert.equal(unauthorized.status, 401);
+
+        const readiness = await fetch(`${baseUrl}/health/ready`);
+        assert.equal(readiness.status, 200);
+        assert.deepEqual(await readiness.json(), {
+            status: 'ready',
+            dependencies: { mysql: 'ready', keywordCache: 'disabled' }
+        });
+
+        const unauthorizedMetrics = await fetch(`${baseUrl}/metrics`);
+        assert.equal(unauthorizedMetrics.status, 401);
+        const metrics = await fetch(`${baseUrl}/metrics`, { headers });
+        assert.equal(await metrics.text(), 'tsumugi_api_redis_up 0\n');
 
         const keyword = {
             guildId: '12345678901234567',

@@ -21,6 +21,8 @@ export interface KeywordHttpHandlerOptions {
     serviceToken: string;
     requestBodyLimitBytes: number;
     readiness: () => Promise<boolean>;
+    optionalHealth?: () => Promise<Record<string, unknown>>;
+    metrics?: () => Promise<string>;
     reportError: (error: unknown) => void;
 }
 
@@ -62,6 +64,13 @@ function sendNoContent(response: ServerResponse): void {
     response.end();
 }
 
+function sendText(response: ServerResponse, status: number, body: string): void {
+    response.statusCode = status;
+    response.setHeader('content-type', 'text/plain; version=0.0.4; charset=utf-8');
+    response.setHeader('cache-control', 'no-store');
+    response.end(body);
+}
+
 export function createKeywordHttpHandler(service: KeywordService, guildService: ManagedGuildService, options: KeywordHttpHandlerOptions) {
     return async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
         if (request.method === 'GET' && request.url === '/health/live') {
@@ -69,8 +78,19 @@ export function createKeywordHttpHandler(service: KeywordService, guildService: 
             return;
         }
         if (request.method === 'GET' && request.url === '/health/ready') {
-            const ready = await options.readiness();
-            sendJson(response, ready ? 200 : 503, { status: ready ? 'ready' : 'unavailable' });
+            const [ready, optionalDependencies] = await Promise.all([options.readiness(), options.optionalHealth?.() ?? Promise.resolve({})]);
+            sendJson(response, ready ? 200 : 503, {
+                status: ready ? 'ready' : 'unavailable',
+                dependencies: { mysql: ready ? 'ready' : 'unavailable', ...optionalDependencies }
+            });
+            return;
+        }
+        if (request.method === 'GET' && request.url === '/metrics') {
+            if (!authorized(request.headers.authorization, options.serviceToken)) {
+                sendError(response, 401, 'unauthorized', 'service認証に失敗しました。');
+                return;
+            }
+            sendText(response, 200, (await options.metrics?.()) ?? '');
             return;
         }
         if (request.method !== 'POST') {
