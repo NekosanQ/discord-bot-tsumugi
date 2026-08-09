@@ -37,19 +37,7 @@ const createCompositionRootZones = (root) => [
     }
 ];
 
-const compositionRootZones = [
-    {
-        target: './src/**/*',
-        from: './src/index.ts',
-        message: compositionRootImportMessage
-    },
-    {
-        target: './src/**/*',
-        from: './src/bootstrap',
-        message: compositionRootImportMessage
-    },
-    ...['api', 'bot', 'web'].flatMap((appName) => createCompositionRootZones(`./apps/${appName}`))
-];
+const compositionRootZones = ['api', 'bot', 'web'].flatMap((appName) => createCompositionRootZones(`./apps/${appName}`));
 
 export default [
     /**
@@ -124,7 +112,7 @@ export default [
             ...importPlugin.flatConfigs.typescript.settings,
             'import/resolver': {
                 typescript: {
-                    project: ['./tsconfig.json', './apps/*/tsconfig.json']
+                    project: ['./apps/*/tsconfig.json']
                 }
             }
         },
@@ -139,20 +127,15 @@ export default [
     },
     /** app間の境界 */
     {
-        files: [
-            'src/**/*.{ts,tsx}',
-            'tests/**/*.{ts,tsx}',
-            'integration-tests/**/*.{ts,tsx}',
-            'apps/*/{src,tests,integration-tests,e2e}/**/*.{ts,tsx}'
-        ],
+        files: ['apps/*/{src,tests,integration-tests,e2e}/**/*.{ts,tsx}'],
         rules: {
             'no-restricted-imports': createRestrictedImportsRule()
         }
     },
     /** 下位コードからcomposition rootへの逆依存を禁止する */
     {
-        files: ['src/**/*.{ts,tsx}', 'apps/*/src/**/*.{ts,tsx}'],
-        ignores: ['src/index.ts', 'src/bootstrap/**/*', 'apps/*/src/index.ts', 'apps/*/src/bootstrap/**/*'],
+        files: ['apps/*/src/**/*.{ts,tsx}'],
+        ignores: ['apps/*/src/index.ts', 'apps/*/src/bootstrap/**/*'],
         rules: {
             'import/no-restricted-paths': [
                 'error',
@@ -166,7 +149,7 @@ export default [
      * Clean Architectureの依存方向
      */
     {
-        files: ['src/domain/**/*.{ts,tsx}', 'apps/*/src/domain/**/*.{ts,tsx}'],
+        files: ['apps/*/src/domain/**/*.{ts,tsx}'],
         rules: {
             'no-restricted-imports': createRestrictedImportsRule(outerFrameworkImportPattern, {
                 regex: String.raw`(?:^|/)(?:application|interface-adapter|infrastructure|bootstrap|app)(?:/|$)`,
@@ -175,7 +158,7 @@ export default [
         }
     },
     {
-        files: ['src/application/**/*.{ts,tsx}', 'apps/*/src/application/**/*.{ts,tsx}'],
+        files: ['apps/*/src/application/**/*.{ts,tsx}'],
         rules: {
             'no-restricted-imports': createRestrictedImportsRule(outerFrameworkImportPattern, {
                 regex: String.raw`(?:^|/)(?:interface-adapter|infrastructure|bootstrap|app)(?:/|$)`,
@@ -184,12 +167,7 @@ export default [
         }
     },
     {
-        files: [
-            'src/interface-adapter/**/*.{ts,tsx}',
-            'src/app/**/*.{ts,tsx}',
-            'apps/*/src/interface-adapter/**/*.{ts,tsx}',
-            'apps/*/src/app/**/*.{ts,tsx}'
-        ],
+        files: ['apps/*/src/interface-adapter/**/*.{ts,tsx}', 'apps/*/src/app/**/*.{ts,tsx}'],
         rules: {
             'no-restricted-imports': createRestrictedImportsRule({
                 regex: String.raw`(?:^|/)(?:infrastructure|bootstrap)(?:/|$)`,
@@ -198,7 +176,7 @@ export default [
         }
     },
     {
-        files: ['src/infrastructure/**/*.{ts,tsx}', 'apps/*/src/infrastructure/**/*.{ts,tsx}'],
+        files: ['apps/*/src/infrastructure/**/*.{ts,tsx}'],
         rules: {
             'no-restricted-imports': createRestrictedImportsRule({
                 regex: String.raw`(?:^|/)(?:interface-adapter|app|bootstrap)(?:/|$)`,
@@ -210,7 +188,7 @@ export default [
      * 無視するファイル・ディレクトリ
      */
     {
-        ignores: ['node_modules/', 'dist/', '*.config.js', '*.config.ts', '.env']
+        ignores: ['**/node_modules/', '**/dist/', '**/logs/', '**/run/', '*.config.js', '*.config.ts', '.env', '.env.*']
     },
     /**
      * Prettierとの競合を避ける設定

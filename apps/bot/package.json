@@ -1,0 +1,45 @@
+{
+    "name": "@tsumugi/bot",
+    "version": "3.0.0",
+    "private": true,
+    "description": "「可愛くて、楽しい」DiscordBot",
+    "type": "module",
+    "main": "dist/index.js",
+    "engines": {
+        "node": "24.x",
+        "npm": ">=10"
+    },
+    "scripts": {
+        "start": "node dist/index.js",
+        "dev": "tsx src/index.ts",
+        "compile": "tsc -p tsconfig.build.json",
+        "typecheck": "tsc --noEmit -p tsconfig.test.json",
+        "test:unit": "tsx --test \"tests/**/*.test.ts\"",
+        "test:integration": "tsx --test --test-concurrency=1 \"integration-tests/**/*.test.ts\"",
+        "test": "npm run test:unit && npm run test:integration",
+        "prisma:generate": "prisma generate --schema prisma/schema.prisma",
+        "prisma:validate": "prisma validate --schema prisma/schema.prisma",
+        "check:architecture": "eslint src tests integration-tests --max-warnings=0 --no-error-on-unmatched-pattern",
+        "check": "npm run lint:prettier && npm run check:architecture && npm run typecheck && npm run test:unit",
+        "lint:prettier": "prettier --check --no-error-on-unmatched-pattern src tests integration-tests package.json \"tsconfig*.json\"",
+        "fix:prettier": "prettier --write --no-error-on-unmatched-pattern src tests integration-tests package.json \"tsconfig*.json\"",
+        "lint:eslint": "eslint src tests integration-tests --max-warnings=0 --no-error-on-unmatched-pattern",
+        "fix:eslint": "eslint src tests integration-tests --fix --no-error-on-unmatched-pattern"
+    },
+    "keywords": [],
+    "author": "NekosanQ",
+    "license": "ISC",
+    "dependencies": {
+        "@prisma/client": "^6.19.3",
+        "discord.js": "^14.27.0",
+        "dotenv": "^16.4.5",
+        "log4js": "^6.9.1",
+        "toml": "^3.0.0"
+    },
+    "devDependencies": {
+        "@types/node": "^24.13.3",
+        "prisma": "^6.19.3",
+        "ts-node": "^10.9.2",
+        "tsx": "^4.20.5"
+    }
+}

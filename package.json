@@ -1,43 +1,41 @@
 {
     "name": "discord-bot-tsumugi",
     "version": "3.0.0",
-    "description": "「可愛くて、楽しい」DiscordBot",
+    "private": true,
+    "description": "「可愛くて、楽しい」DiscordBot monorepo",
     "type": "module",
-    "main": "dist/index.js",
+    "workspaces": [
+        "apps/*",
+        "packages/*"
+    ],
     "engines": {
         "node": "24.x",
         "npm": ">=10"
     },
     "scripts": {
-        "start": "node dist/index.js",
-        "dev": "tsx src/index.ts",
-        "compile": "tsc -p tsconfig.build.json",
-        "typecheck": "tsc --noEmit -p tsconfig.test.json",
-        "test:unit": "tsx --test \"tests/**/*.test.ts\"",
-        "test:integration": "tsx --test --test-concurrency=1 \"integration-tests/**/*.test.ts\"",
-        "test": "npm run test:unit && npm run test:integration",
+        "start": "npm run start --workspace apps/bot",
+        "dev": "npm run dev --workspace apps/bot",
+        "compile": "npm run compile --workspaces --if-present",
+        "typecheck": "npm run typecheck --workspaces --if-present",
+        "test:unit": "npm run test:unit --workspaces --if-present",
+        "test:integration": "npm run test:integration --workspaces --if-present",
+        "test": "npm run test --workspaces --if-present",
         "check:architecture": "eslint . --max-warnings=0",
-        "check": "npm run lint:prettier && npm run check:architecture && npm run typecheck && npm run test:unit",
+        "check": "npm run lint:prettier && npm run check:architecture && npm run check --workspaces --if-present",
+        "prisma:generate": "npm run prisma:generate --workspace apps/bot",
+        "prisma:validate": "npm run prisma:validate --workspace apps/bot",
         "gemini": "gemini",
-        "lint:prettier": "prettier --check --no-error-on-unmatched-pattern src tests AGENTS.md README.md docs .github package.json \"tsconfig*.json\" eslint.config.js",
-        "fix:prettier": "prettier --write --no-error-on-unmatched-pattern src tests AGENTS.md README.md docs .github package.json \"tsconfig*.json\" eslint.config.js",
-        "lint:eslint": "eslint .",
+        "lint:prettier": "prettier --check --no-error-on-unmatched-pattern AGENTS.md README.md docs .github package.json eslint.config.js .devcontainer",
+        "fix:prettier": "prettier --write --no-error-on-unmatched-pattern AGENTS.md README.md docs .github package.json eslint.config.js .devcontainer",
+        "lint:eslint": "eslint . --max-warnings=0",
         "fix:eslint": "eslint . --fix"
     },
     "keywords": [],
     "author": "NekosanQ",
     "license": "ISC",
-    "dependencies": {
-        "@prisma/client": "^6.19.3",
-        "discord.js": "^14.27.0",
-        "dotenv": "^16.4.5",
-        "log4js": "^6.9.1",
-        "toml": "^3.0.0"
-    },
     "devDependencies": {
         "@eslint/js": "^9.35.0",
         "@google/gemini-cli": "^0.6.1",
-        "@types/node": "^24.13.3",
         "eslint": "^9.35.0",
         "eslint-config-prettier": "^9.1.2",
         "eslint-import-resolver-typescript": "^4.4.4",
@@ -45,9 +43,6 @@
         "eslint-plugin-prettier": "^5.5.4",
         "eslint-plugin-simple-import-sort": "^12.1.1",
         "prettier": "^3.6.2",
-        "prisma": "^6.19.3",
-        "ts-node": "^10.9.2",
-        "tsx": "^4.20.5",
         "typescript": "^5.4.5",
         "typescript-eslint": "^8.66.0"
     }
