@@ -18,7 +18,7 @@ services:
         depends_on:
             api-development:
                 condition: service_healthy
-        networks: [discord-bot-network]
+        networks: [discord-bot-network, bot-cooldown-network]
 
     api-development:
         profiles: [development]
@@ -48,6 +48,7 @@ services:
         networks:
             discord-bot-network:
                 aliases: [api]
+            api-cache-network:
 
     api-migrate-development:
         profiles: [development]
@@ -60,7 +61,7 @@ services:
             mysql:
                 condition: service_healthy
         restart: 'no'
-        networks: [discord-bot-network]
+        networks: [discord-bot-network, bot-cooldown-network]
 
     production:
         profiles: [production]
@@ -104,6 +105,7 @@ services:
         networks:
             discord-bot-network:
                 aliases: [api]
+            api-cache-network:
 
     api-migrate-production:
         profiles: [production]
@@ -137,9 +139,47 @@ services:
             retries: 10
         networks: [discord-bot-network]
 
+    redis-api-cache:
+        profiles: [development, production]
+        image: redis:8.2.8-alpine
+        restart: always
+        command: [redis-server, --save, '', --appendonly, 'no', --maxmemory, 128mb, --maxmemory-policy, allkeys-lru]
+        mem_limit: 160m
+        read_only: true
+        tmpfs: [/data]
+        security_opt: [no-new-privileges:true]
+        healthcheck:
+            test: [CMD, redis-cli, ping]
+            interval: 10s
+            timeout: 3s
+            retries: 5
+        networks: [api-cache-network]
+
+    redis-bot-cooldown:
+        profiles: [development, production]
+        image: redis:8.2.8-alpine
+        restart: always
+        command: [redis-server, --save, '', --appendonly, 'no', --maxmemory, 64mb, --maxmemory-policy, volatile-ttl]
+        mem_limit: 96m
+        read_only: true
+        tmpfs: [/data]
+        security_opt: [no-new-privileges:true]
+        healthcheck:
+            test: [CMD, redis-cli, ping]
+            interval: 10s
+            timeout: 3s
+            retries: 5
+        networks: [bot-cooldown-network]
+
 networks:
     discord-bot-network:
         driver: bridge
+    api-cache-network:
+        driver: bridge
+        internal: true
+    bot-cooldown-network:
+        driver: bridge
+        internal: true
 
 volumes:
     mysql-data:

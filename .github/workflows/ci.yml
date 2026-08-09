@@ -11,6 +11,16 @@ jobs:
     verify:
         runs-on: ubuntu-latest
         timeout-minutes: 15
+        services:
+            redis:
+                image: redis:8.2.8-alpine
+                ports:
+                    - 6379:6379
+                options: >-
+                    --health-cmd "redis-cli ping"
+                    --health-interval 5s
+                    --health-timeout 3s
+                    --health-retries 5
 
         steps:
             - name: Checkout
@@ -33,6 +43,9 @@ jobs:
 
             - name: Run integration tests
               run: npm run test:integration --workspaces --if-present
+              env:
+                  API_REDIS_TEST_URL: redis://127.0.0.1:6379
+                  BOT_REDIS_TEST_URL: redis://127.0.0.1:6379
 
             - name: Compile production output
               run: npm run compile
