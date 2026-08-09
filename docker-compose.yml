@@ -1,79 +1,146 @@
 services:
-  development:
-    restart: always
-    build:
-      context: .
-      dockerfile: apps/bot/Dockerfile
-      target: development
-    container_name: discord-bot-tsumugi-dev
-    env_file:
-      - .env.dev
-    environment:
-      - NODE_ENV=development
-      - TZ=Asia/Tokyo
-    volumes:
-      - type: bind
-        source: ./apps/bot/src
-        target: /app/apps/bot/src
-      - type: bind
-        source: ./apps/bot/prisma
-        target: /app/apps/bot/prisma
-      - type: bind
-        source: ./apps/bot/config
-        target: /app/apps/bot/config
-      - type: bind
-        source: ./logs
-        target: /app/apps/bot/run
-    ports:
-      - "5555:5555"
-    depends_on:
-      - mysql
-    networks:
-      - discord-bot-network
+    development:
+        profiles: [development]
+        restart: always
+        build:
+            context: .
+            dockerfile: apps/bot/Dockerfile
+            target: development
+        container_name: discord-bot-tsumugi-dev
+        env_file: [.env.dev]
+        environment:
+            NODE_ENV: development
+            TZ: Asia/Tokyo
+        volumes:
+            - ./apps/bot/src:/app/apps/bot/src
+            - ./apps/bot/config:/app/apps/bot/config
+            - ./logs:/app/apps/bot/run
+        depends_on:
+            api-development:
+                condition: service_healthy
+        networks: [discord-bot-network]
 
-  production:
-    restart: always
-    build:
-      context: .
-      dockerfile: apps/bot/Dockerfile
-      target: production
-    container_name: discord-bot-tsumugi-prod
-    env_file:
-      - .env.prod
-    environment:
-      - NODE_ENV=production
-      - TZ=Asia/Tokyo
-    volumes:
-      - type: bind
-        source: ./logs
-        target: /app/apps/bot/run
-    ports:
-      - "5555:5555"
-    depends_on:
-      - mysql
-    networks:
-      - discord-bot-network
+    api-development:
+        profiles: [development]
+        restart: always
+        build:
+            context: .
+            dockerfile: apps/api/Dockerfile
+            target: development
+        container_name: discord-bot-tsumugi-api-dev
+        command: npm run dev --workspace apps/api
+        env_file: [.env.api.dev]
+        environment:
+            NODE_ENV: development
+            TZ: Asia/Tokyo
+        volumes:
+            - ./apps/api/src:/app/apps/api/src
+            - ./apps/api/config:/app/apps/api/config
+            - ./apps/api/prisma:/app/apps/api/prisma
+        depends_on:
+            api-migrate-development:
+                condition: service_completed_successfully
+        healthcheck:
+            test: [CMD, node, -e, "fetch('http://localhost:3000/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+            interval: 10s
+            timeout: 3s
+            retries: 5
+        networks:
+            discord-bot-network:
+                aliases: [api]
 
-  mysql:
-    image: mysql:8.4
-    container_name: discord-bot-tsumugi-mysql
-    restart: always
-    env_file:
-      - .env.mysql
-    environment:
-      - TZ=Asia/Tokyo
-    volumes:
-      - mysql-data:/var/lib/mysql
-      - ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf
-    ports:
-      - "3306:3306"
-    networks:
-      - discord-bot-network
+    api-migrate-development:
+        profiles: [development]
+        build:
+            context: .
+            dockerfile: apps/api/Dockerfile
+            target: migration
+        env_file: [.env.api.dev]
+        depends_on:
+            mysql:
+                condition: service_healthy
+        restart: 'no'
+        networks: [discord-bot-network]
+
+    production:
+        profiles: [production]
+        restart: always
+        build:
+            context: .
+            dockerfile: apps/bot/Dockerfile
+            target: production
+        container_name: discord-bot-tsumugi-prod
+        env_file: [.env.prod]
+        environment:
+            NODE_ENV: production
+            TZ: Asia/Tokyo
+        volumes:
+            - ./logs:/app/apps/bot/run
+        depends_on:
+            api-production:
+                condition: service_healthy
+        networks: [discord-bot-network]
+
+    api-production:
+        profiles: [production]
+        restart: always
+        build:
+            context: .
+            dockerfile: apps/api/Dockerfile
+            target: production
+        container_name: discord-bot-tsumugi-api-prod
+        env_file: [.env.api.prod]
+        environment:
+            NODE_ENV: production
+            TZ: Asia/Tokyo
+        depends_on:
+            api-migrate-production:
+                condition: service_completed_successfully
+        healthcheck:
+            test: [CMD, node, -e, "fetch('http://localhost:3000/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+            interval: 10s
+            timeout: 3s
+            retries: 5
+        networks:
+            discord-bot-network:
+                aliases: [api]
+
+    api-migrate-production:
+        profiles: [production]
+        build:
+            context: .
+            dockerfile: apps/api/Dockerfile
+            target: migration
+        env_file: [.env.api.prod]
+        depends_on:
+            mysql:
+                condition: service_healthy
+        restart: 'no'
+        networks: [discord-bot-network]
+
+    mysql:
+        image: mysql:8.4
+        container_name: discord-bot-tsumugi-mysql
+        restart: always
+        env_file: [.env.mysql]
+        environment:
+            TZ: Asia/Tokyo
+        volumes:
+            - mysql-data:/var/lib/mysql
+            - ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+        ports:
+            - 127.0.0.1:3306:3306
+        healthcheck:
+            test: [CMD-SHELL, 'mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD --silent']
+            interval: 10s
+            timeout: 5s
+            retries: 10
+        networks: [discord-bot-network]
 
 networks:
-  discord-bot-network:
-    driver: bridge
+    discord-bot-network:
+        driver: bridge
 
 volumes:
-  mysql-data:
-    driver: local
+    mysql-data:
+        driver: local
