@@ -127,6 +127,7 @@ void test('dashboard user sessionとinternal service認証を相互利用させ�
     const projection = new EmptyProjection();
     const handler = createDashboardHttpHandler({
         serviceToken: 'service-token-that-is-long-enough-for-test',
+        webProxyToken: 'web-proxy-token-that-is-long-enough-for-test',
         origin: 'https://dashboard.test',
         secureCookies: true,
         requestBodyLimitBytes: 16384,
@@ -147,7 +148,13 @@ void test('dashboard user sessionとinternal service認証を相互利用させ�
     const port = await listen(server);
 
     try {
-        const start = await fetch(`http://127.0.0.1:${String(port)}/v1/dashboard/auth/discord/start`);
+        const directStart = await fetch(`http://127.0.0.1:${String(port)}/v1/dashboard/auth/discord/start`);
+        assert.equal(directStart.status, 401);
+
+        const proxyHeaders = new Headers();
+        proxyHeaders.set('x-tsumugi-web-proxy', 'web-proxy-token-that-is-long-enough-for-test');
+        proxyHeaders.set('x-tsumugi-client-id', 'a'.repeat(64));
+        const start = await fetch(`http://127.0.0.1:${String(port)}/v1/dashboard/auth/discord/start`, { headers: proxyHeaders });
         assert.equal(start.status, 200);
         const stateCookie = start.headers.get('set-cookie');
         assert.match(stateCookie ?? '', /__Host-tsumugi_oauth_state=/);
@@ -165,8 +172,11 @@ void test('dashboard user sessionとinternal service認証を相互利用させ�
         });
         assert.equal(internalWithUserCookie.status, 401);
 
+        const dashboardHeaders = new Headers();
+        dashboardHeaders.set('authorization', 'Bearer service-token-that-is-long-enough-for-test');
+        dashboardHeaders.set('x-tsumugi-web-proxy', 'web-proxy-token-that-is-long-enough-for-test');
         const dashboardWithServiceBearer = await fetch(`http://127.0.0.1:${String(port)}/v1/dashboard/guilds`, {
-            headers: { authorization: 'Bearer service-token-that-is-long-enough-for-test' }
+            headers: dashboardHeaders
         });
         assert.equal(dashboardWithServiceBearer.status, 401);
     } finally {

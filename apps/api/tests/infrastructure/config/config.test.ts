@@ -20,10 +20,12 @@ void test('dashboard秘密情報を環境変数だけから検証する', () => 
     environment.API_DISCORD_REDIRECT_URI = 'http://localhost:3001/auth/callback';
     environment.API_SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 1).toString('base64');
     environment.API_SESSION_SECRET = Buffer.alloc(32, 2).toString('base64');
+    environment.API_WEB_PROXY_TOKEN = 'web-proxy-token-that-is-at-least-32-characters';
     environment.API_SECURITY_REDIS_URL = 'redis://security:6379';
     const value = loadDashboardEnvironment(environment);
     assert.equal(value.clientId, 'client-id');
     assert.equal(value.securityRedisUrl, 'redis://security:6379');
+    assert.equal(value.webProxyToken, 'web-proxy-token-that-is-at-least-32-characters');
 });
 
 void test('dashboard秘密情報の欠落を起動前に拒否する', () => {

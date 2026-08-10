@@ -29,6 +29,7 @@ import { KeywordValidationError } from '../../../domain/keyword/KeywordErrors.js
 
 export interface DashboardHttpHandlerOptions {
     serviceToken: string;
+    webProxyToken: string;
     origin: string;
     secureCookies: boolean;
     requestBodyLimitBytes: number;
@@ -46,6 +47,13 @@ class RequestBodyTooLargeError extends Error {}
 function authorized(header: string | undefined, expectedToken: string): boolean {
     if (!header?.startsWith('Bearer ')) return false;
     const provided = Buffer.from(header.slice(7));
+    const expected = Buffer.from(expectedToken);
+    return provided.length === expected.length && timingSafeEqual(provided, expected);
+}
+
+function authorizedProxy(header: string | string[] | undefined, expectedToken: string): boolean {
+    if (typeof header !== 'string') return false;
+    const provided = Buffer.from(header);
     const expected = Buffer.from(expectedToken);
     return provided.length === expected.length && timingSafeEqual(provided, expected);
 }
@@ -121,6 +129,8 @@ function assertMutationRequest(request: IncomingMessage, origin: string): void {
 }
 
 function clientIdentifier(request: IncomingMessage): string {
+    const proxyIdentifier = request.headers['x-tsumugi-client-id'];
+    if (typeof proxyIdentifier === 'string' && /^[a-f0-9]{64}$/.test(proxyIdentifier)) return proxyIdentifier;
     return request.socket.remoteAddress ?? 'unknown';
 }
 
@@ -151,6 +161,10 @@ export function createDashboardHttpHandler(options: DashboardHttpHandlerOptions)
         const csrfCookie = cookies.get(names.csrf);
 
         try {
+            if (requestUrl.pathname.startsWith('/v1/dashboard/') && !authorizedProxy(request.headers['x-tsumugi-web-proxy'], options.webProxyToken)) {
+                sendError(response, 401, 'unauthorized', 'Web proxy認証に失敗しました。');
+                return;
+            }
             if (request.method === 'GET' && requestUrl.pathname === '/v1/dashboard/auth/discord/start') {
                 await enforceRateLimit(options.rateLimiter, 'oauthStart', clientIdentifier(request));
                 const result = await options.auth.beginOAuth(requestUrl.searchParams.get('returnTo') ?? undefined);

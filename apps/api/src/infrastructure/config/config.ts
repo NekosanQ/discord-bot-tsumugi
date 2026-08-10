@@ -41,6 +41,7 @@ export interface DashboardEnvironment {
     redirectUri: string;
     sessionEncryptionKey: string;
     sessionSecret: string;
+    webProxyToken: string;
     securityRedisUrl?: string;
 }
 
@@ -120,12 +121,15 @@ export function loadDashboardEnvironment(environment: NodeJS.ProcessEnv = proces
     const redirectUri = required('API_DISCORD_REDIRECT_URI');
     const parsedRedirect = new URL(redirectUri);
     if (!['http:', 'https:'].includes(parsedRedirect.protocol)) throw new TypeError('API_DISCORD_REDIRECT_URIはHTTP(S) URLである必要があります。');
+    const webProxyToken = required('API_WEB_PROXY_TOKEN');
+    if (webProxyToken.length < 32) throw new TypeError('API_WEB_PROXY_TOKENは32文字以上で設定してください。');
     return {
         clientId: required('API_DISCORD_CLIENT_ID'),
         clientSecret: required('API_DISCORD_CLIENT_SECRET'),
         redirectUri,
         sessionEncryptionKey: required('API_SESSION_ENCRYPTION_KEY'),
         sessionSecret: required('API_SESSION_SECRET'),
+        webProxyToken,
         securityRedisUrl: environment.API_SECURITY_REDIS_URL
     };
 }

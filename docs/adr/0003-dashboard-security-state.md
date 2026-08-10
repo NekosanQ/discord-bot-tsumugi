@@ -11,6 +11,7 @@
 
 - OAuth code交換、token refresh、Discord guild権限の再検証はAPIだけが行う。WebとbrowserにはDiscord token、Bot service credential、API内部credentialを渡さない。
 - browserは32 byteのopaque session cookieだけを保持する。production cookieは`__Host-` prefix、`Secure`、`HttpOnly`、`SameSite=Lax`、`Path=/`を必須にする。
+- APIのdashboard routeは、利用者sessionとは別にWeb server専用proxy tokenも必須とする。Webはbrowserから同名headerを受け付けず、API内部credentialをbrowserへ渡さない。
 - session ID、OAuth state、CSRF tokenはAPIの環境秘密鍵によるHMAC digestだけをMySQLへ保存する。Discord access/refresh tokenはAES-256-GCMで暗号化し、鍵は環境変数だけで与える。
 - OAuth stateは10分、一回限りとし、同じ値をHttpOnly cookieにも束縛する。return先は`/dashboard`配下だけに制限する。
 - sessionはidle 8時間、absolute 7日とする。logoutはMySQL sessionを先に失効させ、Discord revokeは有限timeoutのbest-effortとする。
@@ -23,6 +24,7 @@
 - 用途: OAuth開始、OAuth callback、dashboard mutationの固定window rate limitだけ。
 - 正本: なし。session、OAuth state、監査の正本はMySQLであり、Redis全消失で永続データを失わない。
 - key: `tsumugi:api-security:v1:{environment}:rate-limit:{bucket}:{hmac(identifier)}`。user、guild、IPを平文keyやmetrics labelへ含めない。
+- OAuthの識別子は、Webが信頼済みreverse proxyのclient addressまたはHttpOnly client cookieからHMAC化したopaque IDだけをAPIへ送る。これにより全利用者がWeb container IPの同じwindowを共有せず、生IPもAPIへ保存しない。
 - TTL: 既定60秒。上限はOAuth開始10、callback 20、mutation 30で、非秘密設定から環境別に変更できる。
 - 原子性: Lua内の`INCR`と初回`PEXPIRE`を単一commandとして実行する。read後writeで判定しない。
 - 容量: Redis 8.2.8、`maxmemory 64mb`、`noeviction`、container上限96MB。hostへportを公開しない。

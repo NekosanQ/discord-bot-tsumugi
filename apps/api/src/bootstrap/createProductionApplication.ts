@@ -189,6 +189,7 @@ export function createProductionApplication(serviceToken: string): ApiApplicatio
     });
     const dashboardHandler = createDashboardHttpHandler({
         serviceToken,
+        webProxyToken: dashboardEnvironment.webProxyToken,
         origin: config.dashboard.origin,
         secureCookies: process.env.NODE_ENV === 'production',
         requestBodyLimitBytes: config.requestBodyLimitBytes,
