@@ -21,6 +21,7 @@ export interface KeywordHttpHandlerOptions {
     serviceToken: string;
     requestBodyLimitBytes: number;
     readiness: () => Promise<boolean>;
+    requiredHealth?: () => Promise<Record<string, 'ready' | 'unavailable' | 'in-memory'>>;
     optionalHealth?: () => Promise<Record<string, unknown>>;
     metrics?: () => Promise<string>;
     reportError: (error: unknown) => void;
@@ -78,10 +79,15 @@ export function createKeywordHttpHandler(service: KeywordService, guildService: 
             return;
         }
         if (request.method === 'GET' && request.url === '/health/ready') {
-            const [ready, optionalDependencies] = await Promise.all([options.readiness(), options.optionalHealth?.() ?? Promise.resolve({})]);
+            const [mysqlReady, requiredDependencies, optionalDependencies] = await Promise.all([
+                options.readiness(),
+                options.requiredHealth?.() ?? Promise.resolve({}),
+                options.optionalHealth?.() ?? Promise.resolve({})
+            ]);
+            const ready = mysqlReady && Object.values(requiredDependencies).every((state) => state === 'ready' || state === 'in-memory');
             sendJson(response, ready ? 200 : 503, {
                 status: ready ? 'ready' : 'unavailable',
-                dependencies: { mysql: ready ? 'ready' : 'unavailable', ...optionalDependencies }
+                dependencies: { mysql: mysqlReady ? 'ready' : 'unavailable', ...requiredDependencies, ...optionalDependencies }
             });
             return;
         }
