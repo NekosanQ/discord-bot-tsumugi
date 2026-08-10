@@ -46,7 +46,7 @@ export interface DashboardAuthRepository {
         idHash: string,
         tokens: Pick<DashboardSessionRecord, 'accessTokenCiphertext' | 'refreshTokenCiphertext' | 'tokenExpiresAt'>
     ) => Promise<void>;
-    touchSession: (idHash: string, idleExpiresAt: Date, now: Date) => Promise<void>;
+    touchSession: (idHash: string, idleExpiresAt: Date, now: Date) => Promise<boolean>;
     revokeSession: (idHash: string, now: Date) => Promise<void>;
 }
 

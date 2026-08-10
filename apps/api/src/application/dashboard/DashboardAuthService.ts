@@ -101,9 +101,10 @@ export class DashboardAuthService {
     public async getSession(sessionId: string | undefined, csrfToken: string | undefined): Promise<AuthenticatedDashboardSession> {
         const authenticated = await this.authenticate(sessionId);
         const session = await this.repository.findSession(this.secrets.digest(sessionId ?? ''));
-        if (!session || !csrfToken || !this.secrets.equals(this.secrets.digest(csrfToken), session.csrfHash)) {
-            throw new DashboardCsrfError();
+        if (!session || session.revokedAt || session.idleExpiresAt <= this.clock() || session.absoluteExpiresAt <= this.clock()) {
+            throw new DashboardAuthenticationError();
         }
+        if (!csrfToken || !this.secrets.equals(this.secrets.digest(csrfToken), session.csrfHash)) throw new DashboardCsrfError();
         return { ...authenticated, csrfToken };
     }
 
@@ -144,7 +145,8 @@ export class DashboardAuthService {
         }
 
         const idleExpiresAt = new Date(Math.min(now.getTime() + this.config.sessionIdleTtlMs, session.absoluteExpiresAt.getTime()));
-        await this.repository.touchSession(session.idHash, idleExpiresAt, now);
+        const active = await this.repository.touchSession(session.idHash, idleExpiresAt, now);
+        if (!active) throw new DashboardAuthenticationError();
         return { user: session.user, accessToken };
     }
 }

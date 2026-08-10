@@ -48,10 +48,11 @@ class MemoryAuthRepository implements DashboardAuthRepository {
         return Promise.resolve();
     }
 
-    public touchSession(idHash: string, idleExpiresAt: Date): Promise<void> {
+    public touchSession(idHash: string, idleExpiresAt: Date, now: Date): Promise<boolean> {
         const session = this.sessions.get(idHash);
-        if (session) this.sessions.set(idHash, { ...session, idleExpiresAt });
-        return Promise.resolve();
+        if (!session || session.revokedAt || session.idleExpiresAt <= now || session.absoluteExpiresAt <= now) return Promise.resolve(false);
+        this.sessions.set(idHash, { ...session, idleExpiresAt });
+        return Promise.resolve(true);
     }
 
     public revokeSession(idHash: string, now: Date): Promise<void> {

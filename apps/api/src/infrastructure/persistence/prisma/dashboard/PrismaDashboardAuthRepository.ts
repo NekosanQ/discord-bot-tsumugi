@@ -83,9 +83,13 @@ export class PrismaDashboardAuthRepository implements DashboardAuthRepository {
         });
     }
 
-    public async touchSession(idHash: string, idleExpiresAt: Date, now: Date): Promise<void> {
-        await this.run(async (): Promise<void> => {
-            await this.prisma.dashboardSession.update({ where: { idHash }, data: { idleExpiresAt, lastSeenAt: now } });
+    public async touchSession(idHash: string, idleExpiresAt: Date, now: Date): Promise<boolean> {
+        return this.run(async (): Promise<boolean> => {
+            const updated = await this.prisma.dashboardSession.updateMany({
+                where: { idHash, revokedAt: null, idleExpiresAt: { gt: now }, absoluteExpiresAt: { gt: now } },
+                data: { idleExpiresAt, lastSeenAt: now }
+            });
+            return updated.count === 1;
         });
     }
 

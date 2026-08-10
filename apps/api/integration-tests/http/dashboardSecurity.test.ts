@@ -44,8 +44,8 @@ class EmptyAuthRepository implements DashboardAuthRepository {
         return Promise.resolve();
     }
 
-    public touchSession(): Promise<void> {
-        return Promise.resolve();
+    public touchSession(): Promise<boolean> {
+        return Promise.resolve(false);
     }
 
     public revokeSession(): Promise<void> {
