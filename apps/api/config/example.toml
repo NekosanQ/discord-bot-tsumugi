@@ -11,3 +11,19 @@ connectTimeoutMs = 500
 commandTimeoutMs = 250
 reconnectBaseDelayMs = 100
 reconnectMaxDelayMs = 5000
+
+[dashboard]
+origin = "http://localhost:3001"
+discordRequestTimeoutMs = 5000
+oauthStateTtlMs = 600000
+sessionIdleTtlMs = 28800000
+sessionAbsoluteTtlMs = 604800000
+tokenRefreshSkewMs = 60000
+rateLimitWindowMs = 60000
+authStartLimit = 10
+authCallbackLimit = 20
+mutationLimit = 30
+securityRedisConnectTimeoutMs = 500
+securityRedisCommandTimeoutMs = 250
+securityRedisReconnectBaseDelayMs = 100
+securityRedisReconnectMaxDelayMs = 5000

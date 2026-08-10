@@ -79,6 +79,21 @@ export class RedisConnection {
         return this.withTimeout((abortSignal) => this.client.withCommandOptions({ abortSignal }).del(key));
     }
 
+    public consumeFixedWindow(key: string, limit: number, ttlMs: number): Promise<boolean> {
+        const script = [
+            "local count = redis.call('INCR', KEYS[1])",
+            "if count == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[1]) end",
+            'return count <= tonumber(ARGV[2])'
+        ].join('\n');
+        return this.withTimeout(async (abortSignal): Promise<boolean> => {
+            const result = await this.client.withCommandOptions({ abortSignal }).eval(script, {
+                keys: [key],
+                arguments: [String(ttlMs), String(limit)]
+            });
+            return result === 1;
+        });
+    }
+
     public info(section: 'memory' | 'stats'): Promise<string> {
         return this.withTimeout((abortSignal) => this.client.withCommandOptions({ abortSignal }).info(section));
     }
