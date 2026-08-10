@@ -49,6 +49,7 @@ services:
             discord-bot-network:
                 aliases: [api]
             api-cache-network:
+            api-security-network:
 
     api-migrate-development:
         profiles: [development]
@@ -106,6 +107,7 @@ services:
             discord-bot-network:
                 aliases: [api]
             api-cache-network:
+            api-security-network:
 
     api-migrate-production:
         profiles: [production]
@@ -171,6 +173,22 @@ services:
             retries: 5
         networks: [bot-cooldown-network]
 
+    redis-api-security:
+        profiles: [development, production]
+        image: redis:8.2.8-alpine
+        restart: always
+        command: [redis-server, --save, '', --appendonly, 'no', --maxmemory, 64mb, --maxmemory-policy, noeviction]
+        mem_limit: 96m
+        read_only: true
+        tmpfs: [/data]
+        security_opt: [no-new-privileges:true]
+        healthcheck:
+            test: [CMD, redis-cli, ping]
+            interval: 10s
+            timeout: 3s
+            retries: 5
+        networks: [api-security-network]
+
 networks:
     discord-bot-network:
         driver: bridge
@@ -178,6 +196,9 @@ networks:
         driver: bridge
         internal: true
     bot-cooldown-network:
+        driver: bridge
+        internal: true
+    api-security-network:
         driver: bridge
         internal: true
 
