@@ -1,6 +1,9 @@
 import { Client, GatewayIntentBits, Partials } from 'discord.js';
 
 import type { CooldownStore } from '../application/cooldown/CooldownStore.js';
+import { DrawOmikuji } from '../application/fun/omikuji/DrawOmikuji.js';
+import { PlayRockPaperScissors } from '../application/fun/rps/PlayRockPaperScissors.js';
+import { SpinSlot } from '../application/fun/slot/SpinSlot.js';
 import CommandHandler from '../commands/CommandHandler.js';
 import { createCommands } from '../commands/index.js';
 import EventHandler from '../events/EventHandler.js';
@@ -10,6 +13,8 @@ import { InMemoryCooldownStore } from '../infrastructure/cooldown/memory/InMemor
 import { BotRedisKeyBuilder } from '../infrastructure/cooldown/redis/BotRedisKeyBuilder.js';
 import { RedisCooldownStore } from '../infrastructure/cooldown/redis/RedisCooldownStore.js';
 import { ResilientCooldownStore } from '../infrastructure/cooldown/ResilientCooldownStore.js';
+import { MathRandomSource } from '../infrastructure/fun/MathRandomSource.js';
+import { SystemDelay } from '../infrastructure/fun/SystemDelay.js';
 import { RedisConnection } from '../infrastructure/redis/RedisConnection.js';
 import { RedisMetrics } from '../infrastructure/redis/RedisMetrics.js';
 import CommandService from '../services/CommandService.js';
@@ -72,7 +77,13 @@ export async function createProductionApplication(discordToken: string, apiServi
         });
         clientToCleanUp = client;
 
-        const commands = createCommands({ keywordManagement });
+        const randomSource = new MathRandomSource();
+        const commands = createCommands({
+            drawOmikuji: new DrawOmikuji(randomSource),
+            keywordManagement,
+            playRockPaperScissors: new PlayRockPaperScissors(randomSource),
+            spinSlot: new SpinSlot(randomSource, new SystemDelay())
+        });
         const commandHandler = new CommandHandler(commands, client, applicationConfig.guildId, cooldownStore);
         CommandService.initialize(commandHandler);
 
