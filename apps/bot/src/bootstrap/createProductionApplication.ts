@@ -4,6 +4,11 @@ import type { CooldownStore } from '../application/cooldown/CooldownStore.js';
 import { DrawOmikuji } from '../application/fun/omikuji/DrawOmikuji.js';
 import { PlayRockPaperScissors } from '../application/fun/rps/PlayRockPaperScissors.js';
 import { SpinSlot } from '../application/fun/slot/SpinSlot.js';
+import { GetBotInformation } from '../application/general/bot/GetBotInformation.js';
+import { FollowAnnouncement } from '../application/general/follow/FollowAnnouncement.js';
+import { GetGuildInformation } from '../application/general/guild/GetGuildInformation.js';
+import { MeasurePing } from '../application/general/ping/MeasurePing.js';
+import { GetUserInformation } from '../application/general/user/GetUserInformation.js';
 import CommandHandler from '../commands/CommandHandler.js';
 import { createCommands } from '../commands/index.js';
 import EventHandler from '../events/EventHandler.js';
@@ -15,8 +20,15 @@ import { RedisCooldownStore } from '../infrastructure/cooldown/redis/RedisCooldo
 import { ResilientCooldownStore } from '../infrastructure/cooldown/ResilientCooldownStore.js';
 import { MathRandomSource } from '../infrastructure/fun/MathRandomSource.js';
 import { SystemDelay } from '../infrastructure/fun/SystemDelay.js';
+import { DiscordBotInformationReader } from '../infrastructure/general/bot/DiscordBotInformationReader.js';
+import { DiscordAnnouncementFollower } from '../infrastructure/general/follow/DiscordAnnouncementFollower.js';
+import { DiscordGuildInformationReader } from '../infrastructure/general/guild/DiscordGuildInformationReader.js';
+import { SafeCommandFailureLogger } from '../infrastructure/general/SafeCommandFailureLogger.js';
+import { SystemClock } from '../infrastructure/general/SystemClock.js';
+import { DiscordUserInformationReader } from '../infrastructure/general/user/DiscordUserInformationReader.js';
 import { RedisConnection } from '../infrastructure/redis/RedisConnection.js';
 import { RedisMetrics } from '../infrastructure/redis/RedisMetrics.js';
+import { DiscordEmbedFactory } from '../interface-adapter/discord/presentation/DiscordEmbedFactory.js';
 import CommandService from '../services/CommandService.js';
 import { type Config, initializeConfig, loadConfig, resetConfigAfterFailedInitialization } from '../utils/config.js';
 import { configureLogging, logger, shutdownLogging } from '../utils/log.js';
@@ -78,11 +90,55 @@ export async function createProductionApplication(discordToken: string, apiServi
         clientToCleanUp = client;
 
         const randomSource = new MathRandomSource();
+        const clock = new SystemClock();
+        const commandFailureLogger = new SafeCommandFailureLogger(logger);
+        const embedFactory = new DiscordEmbedFactory({
+            botColor: applicationConfig.botColor,
+            errorColor: applicationConfig.errorColor,
+            errorEmoji: applicationConfig.errorEmoji
+        });
         const commands = createCommands({
+            botInformation: new GetBotInformation(new DiscordBotInformationReader(client), clock),
+            botPresentation: {
+                iconUrl: applicationConfig.iconURL,
+                inviteUrl: applicationConfig.inviteURL,
+                supportGuildUrl: applicationConfig.supportGuildURL
+            },
+            commandFailureLogger,
             drawOmikuji: new DrawOmikuji(randomSource),
+            embedFactory,
+            followAnnouncement: new FollowAnnouncement(new DiscordAnnouncementFollower(client, applicationConfig.announcementChannelId)),
+            guildInformation: new GetGuildInformation(new DiscordGuildInformationReader(client), commandFailureLogger, clock, {
+                memberEmoji: applicationConfig.memberEmoji,
+                botEmoji: applicationConfig.botEmoji,
+                emoji: applicationConfig.emoji,
+                gifEmoji: applicationConfig.gifEmoji,
+                channelEmoji: {
+                    category: applicationConfig.channelEmoji.category,
+                    publicText: applicationConfig.channelEmoji.publicText,
+                    lockedText: applicationConfig.channelEmoji.lockedText,
+                    publicVoice: applicationConfig.channelEmoji.publicVoice,
+                    lockedVoice: applicationConfig.channelEmoji.lockedVoice,
+                    publicAnnouncement: applicationConfig.channelEmoji.publicAnnouncement,
+                    lockedAnnouncement: applicationConfig.channelEmoji.lockedAnnouncement,
+                    publicStage: applicationConfig.channelEmoji.publicStage,
+                    lockedStage: applicationConfig.channelEmoji.lockedStage
+                }
+            }),
             keywordManagement,
+            measurePing: new MeasurePing(),
             playRockPaperScissors: new PlayRockPaperScissors(randomSource),
-            spinSlot: new SpinSlot(randomSource, new SystemDelay())
+            spinSlot: new SpinSlot(randomSource, new SystemDelay()),
+            userInformation: new GetUserInformation(new DiscordUserInformationReader(client), commandFailureLogger, clock, {
+                botEmoji: applicationConfig.botEmoji,
+                statusEmoji: {
+                    online: applicationConfig.statusEmoji.online,
+                    idle: applicationConfig.statusEmoji.idle,
+                    dnd: applicationConfig.statusEmoji.dnd,
+                    streaming: applicationConfig.statusEmoji.streaming,
+                    invisible: applicationConfig.statusEmoji.invisible
+                }
+            })
         });
         const commandHandler = new CommandHandler(commands, client, applicationConfig.guildId, cooldownStore);
         CommandService.initialize(commandHandler);
