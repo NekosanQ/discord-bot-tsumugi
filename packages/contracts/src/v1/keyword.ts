@@ -34,7 +34,15 @@ export interface SetGuildInstallationRequest {
     installed: boolean;
 }
 
-export type ApiErrorCode = 'invalid_request' | 'unauthorized' | 'forbidden' | 'not_found' | 'conflict' | 'dependency_failure' | 'internal_error';
+export type ApiErrorCode =
+    | 'invalid_request'
+    | 'unauthorized'
+    | 'forbidden'
+    | 'not_found'
+    | 'conflict'
+    | 'rate_limited'
+    | 'dependency_failure'
+    | 'internal_error';
 
 export interface ApiErrorResponse {
     error: {
@@ -49,6 +57,7 @@ const apiErrorCodes: readonly ApiErrorCode[] = [
     'forbidden',
     'not_found',
     'conflict',
+    'rate_limited',
     'dependency_failure',
     'internal_error'
 ];

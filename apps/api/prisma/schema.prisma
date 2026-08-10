@@ -17,12 +17,21 @@ model ManagedGuild {
 }
 
 model Channel {
-  id       String        @id
-  guildId  String?
-  guild    ManagedGuild? @relation(fields: [guildId], references: [id])
-  keywords Keyword[]
+  id        String              @id
+  guildId   String?
+  guild     ManagedGuild?       @relation(fields: [guildId], references: [id])
+  name      String?
+  type      DiscordChannelType?
+  available Boolean             @default(false)
+  syncedAt  DateTime?
+  keywords  Keyword[]
 
   @@index([guildId])
+}
+
+enum DiscordChannelType {
+  TEXT
+  ANNOUNCEMENT
 }
 
 model Keyword {
@@ -33,4 +42,72 @@ model Keyword {
   channel   Channel @relation(fields: [channelId], references: [id])
 
   @@unique([channelId, trigger])
+}
+
+model DashboardUser {
+  id          String             @id
+  displayName String
+  avatarHash  String?
+  sessions    DashboardSession[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}
+
+model DashboardSession {
+  idHash                 String        @id @db.Char(64)
+  userId                 String
+  user                   DashboardUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessTokenCiphertext  String        @db.Text
+  refreshTokenCiphertext String        @db.Text
+  tokenExpiresAt         DateTime
+  idleExpiresAt          DateTime
+  absoluteExpiresAt      DateTime
+  csrfHash               String        @db.Char(64)
+  keyVersion             Int           @default(1)
+  revokedAt              DateTime?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+  lastSeenAt             DateTime      @default(now())
+
+  @@index([userId])
+  @@index([idleExpiresAt])
+  @@index([absoluteExpiresAt])
+}
+
+model OAuthAttempt {
+  stateHash  String    @id @db.Char(64)
+  returnTo   String    @db.VarChar(512)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([expiresAt])
+}
+
+enum AuditActorType {
+  USER
+  SERVICE
+}
+
+enum AuditOutcome {
+  SUCCEEDED
+  DENIED
+  FAILED
+}
+
+model AuditLog {
+  id            BigInt         @id @default(autoincrement())
+  occurredAt    DateTime       @default(now())
+  actorType     AuditActorType
+  actorId       String
+  guildId       String?
+  action        String
+  outcome       AuditOutcome
+  resourceType  String
+  resourceId    String?
+  correlationId String         @db.Char(36)
+
+  @@index([occurredAt])
+  @@index([guildId, occurredAt])
+  @@index([actorId, occurredAt])
 }
