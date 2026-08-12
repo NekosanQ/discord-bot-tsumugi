@@ -32,7 +32,6 @@ import { RedisConnection } from '../infrastructure/redis/RedisConnection.js';
 import { RedisMetrics } from '../infrastructure/redis/RedisMetrics.js';
 import { DiscordGuildSnapshotSynchronizer } from '../interface-adapter/discord/guild-snapshot/DiscordGuildSnapshotSynchronizer.js';
 import { DiscordEmbedFactory } from '../interface-adapter/discord/presentation/DiscordEmbedFactory.js';
-import CommandService from '../services/CommandService.js';
 import { type Config, initializeConfig, loadConfig, resetConfigAfterFailedInitialization } from '../utils/config.js';
 import { configureLogging, logger, shutdownLogging } from '../utils/log.js';
 import { BotApplication, createApplication } from './createApplication.js';
@@ -131,6 +130,11 @@ export async function createProductionApplication(discordToken: string, apiServi
                     lockedStage: applicationConfig.channelEmoji.lockedStage
                 }
             }),
+            helpPresentation: {
+                iconUrl: applicationConfig.iconURL,
+                inviteUrl: applicationConfig.inviteURL,
+                supportGuildUrl: applicationConfig.supportGuildURL
+            },
             keywordManagement,
             measurePing: new MeasurePing(),
             playRockPaperScissors: new PlayRockPaperScissors(randomSource),
@@ -147,7 +151,6 @@ export async function createProductionApplication(discordToken: string, apiServi
             })
         });
         const commandHandler = new CommandHandler(commands, client, applicationConfig.guildId, cooldownStore);
-        CommandService.initialize(commandHandler);
 
         const createdEvents = createEvents({ client, commandHandler, guildSnapshots, keywordManagement });
         const eventHandler = new EventHandler(createdEvents.events);

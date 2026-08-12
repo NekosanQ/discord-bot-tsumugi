@@ -72,6 +72,11 @@ void test('createCommandsは移行済みコマンドを呼び出しごとに生�
                 }
             }
         ),
+        helpPresentation: {
+            iconUrl: 'https://example.com/icon.png',
+            inviteUrl: 'https://example.com/invite',
+            supportGuildUrl: 'https://example.com/support'
+        },
         keywordManagement,
         measurePing: new MeasurePing(),
         playRockPaperScissors: new PlayRockPaperScissors(randomSource),
@@ -85,7 +90,7 @@ void test('createCommandsは移行済みコマンドを呼び出しごとに生�
     const first = createCommands(dependencies);
     const second = createCommands(dependencies);
 
-    for (const commandName of ['ping', 'bot', 'follow', 'user', 'guild', 'omikuji', 'rpc', 'slot']) {
+    for (const commandName of ['ping', 'help', 'bot', 'follow', 'user', 'guild', 'omikuji', 'rpc', 'slot']) {
         assert.notStrictEqual(findCommand(first, commandName), findCommand(second, commandName));
     }
 });

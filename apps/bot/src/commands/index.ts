@@ -7,6 +7,7 @@ import type { FollowAnnouncement } from '../application/general/follow/FollowAnn
 import type { GetGuildInformation } from '../application/general/guild/GetGuildInformation.js';
 import type { MeasurePing } from '../application/general/ping/MeasurePing.js';
 import type { GetUserInformation } from '../application/general/user/GetUserInformation.js';
+import { ImmutableCommandCatalog } from '../application/help/ImmutableCommandCatalog.js';
 import type { KeywordManagement } from '../application/keyword/KeywordManagement.js';
 import { OmikujiCommand } from '../interface-adapter/discord/fun/omikuji/OmikujiCommand.js';
 import { RPCCommand } from '../interface-adapter/discord/fun/rps/RPCCommand.js';
@@ -26,11 +27,20 @@ import { PingPresenter } from '../interface-adapter/discord/general/ping/PingPre
 import { UserCommand } from '../interface-adapter/discord/general/user/UserCommand.js';
 import { UserController } from '../interface-adapter/discord/general/user/UserController.js';
 import { UserPresenter } from '../interface-adapter/discord/general/user/UserPresenter.js';
+import { mapCommandCatalogEntries } from '../interface-adapter/discord/help/CommandCatalogMapper.js';
+import { HelpCategoryMenuAction } from '../interface-adapter/discord/help/HelpCategoryMenuAction.js';
+import { HelpCommand } from '../interface-adapter/discord/help/HelpCommand.js';
+import { HelpComponents } from '../interface-adapter/discord/help/HelpComponents.js';
+import { HelpController } from '../interface-adapter/discord/help/HelpController.js';
+import { HelpOperationMenuAction } from '../interface-adapter/discord/help/HelpOperationMenuAction.js';
+import { type HelpPresentationOptions, HelpPresenter } from '../interface-adapter/discord/help/HelpPresenter.js';
+import { DeleteOperation } from '../interface-adapter/discord/help/operations/DeleteOperation.js';
+import { FixationOperation } from '../interface-adapter/discord/help/operations/FixationOperation.js';
+import { GuideOperation } from '../interface-adapter/discord/help/operations/GuideOperation.js';
+import type { HelpOperation } from '../interface-adapter/discord/help/operations/HelpOperation.js';
+import { HomeOperation } from '../interface-adapter/discord/help/operations/HomeOperation.js';
 import type { DiscordEmbedFactory } from '../interface-adapter/discord/presentation/DiscordEmbedFactory.js';
 import { InteractionBase } from './base/interaction_base.js';
-import helpSelectMenuAction from './general/help/actions/HelpCategoryMenuAction.js';
-import helpOperationMenuAction from './general/help/actions/HelpOperationMenuAction.js';
-import helpCommand from './general/help/HelpCommand.js';
 import { KeywordAddModal } from './keywordChat/action/KeywordAddModal.js';
 import { KeywordListMenuAction } from './keywordChat/action/KeywordListMenuAction.js';
 import { KeywordAddCommand } from './keywordChat/KeywordAddCommand.js';
@@ -46,6 +56,7 @@ export interface CommandFactoryDependencies {
     embedFactory: DiscordEmbedFactory;
     followAnnouncement: FollowAnnouncement;
     guildInformation: GetGuildInformation;
+    helpPresentation: HelpPresentationOptions;
     keywordManagement: KeywordManagement;
     measurePing: MeasurePing;
     playRockPaperScissors: PlayRockPaperScissors;
@@ -74,6 +85,33 @@ export function createCommands(dependencies: CommandFactoryDependencies): Intera
     const keywordAddCommand = new KeywordAddCommand(keywordCommandGroup, keywordAddModal);
     const keywordRemoveCommand = new KeywordRemoveCommand(keywordCommandGroup, dependencies.keywordManagement);
     const keywordListCommand = new KeywordListCommand(keywordCommandGroup, dependencies.keywordManagement, keywordListMenuAction);
+    const catalog = new ImmutableCommandCatalog(
+        mapCommandCatalogEntries([
+            pingCommand,
+            botCommand,
+            omikujiCommand,
+            followCommand,
+            slotCommand,
+            rpsCommand,
+            keywordAddCommand,
+            keywordCommandGroup,
+            keywordRemoveCommand,
+            keywordListCommand,
+            userCommand,
+            guildCommand
+        ])
+    );
+    const helpPresenter = new HelpPresenter(dependencies.embedFactory, dependencies.helpPresentation);
+    const helpSelectMenuAction = new HelpCategoryMenuAction(catalog, helpPresenter);
+    const operations = new Map<string, HelpOperation>([
+        ['home', new HomeOperation(catalog, helpPresenter)],
+        ['fixation', new FixationOperation()],
+        ['delete', new DeleteOperation()],
+        ['guide', new GuideOperation(helpPresenter)]
+    ]);
+    const helpOperationMenuAction = new HelpOperationMenuAction(operations);
+    const helpComponents = new HelpComponents(helpSelectMenuAction, helpOperationMenuAction);
+    const helpCommand = new HelpCommand(new HelpController(catalog, helpPresenter, helpComponents));
 
     return [
         pingCommand,
