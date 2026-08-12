@@ -124,7 +124,16 @@ export function createProductionApplication(serviceToken: string): ApiApplicatio
             }
         }
     );
-    const dashboard = new DashboardService(dashboardAuth, discord, projection, new PrismaDashboardKeywordRepository(prisma));
+    const dashboard = new DashboardService(
+        dashboardAuth,
+        discord,
+        projection,
+        new PrismaDashboardKeywordRepository(prisma),
+        keywordCache,
+        (error): void => {
+            redisMetrics.recordFallback(error instanceof RedisCommandTimeoutError);
+        }
+    );
     const snapshots = new DashboardSnapshotService(projection);
     const rateLimitPolicy: DashboardRateLimitPolicy = {
         windowMs: config.dashboard.rateLimitWindowMs,

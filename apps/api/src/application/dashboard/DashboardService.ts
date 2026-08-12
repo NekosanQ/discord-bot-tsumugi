@@ -9,6 +9,8 @@ import {
 } from '../../domain/dashboard/DashboardTypes.js';
 import { createKeyword } from '../../domain/keyword/Keyword.js';
 import { KeywordNotFoundError } from '../keyword/KeywordApplicationErrors.js';
+import type { KeywordLookupCache } from '../keyword/KeywordLookupCache.js';
+import type { KeywordScope } from '../keyword/KeywordRepository.js';
 import type { DashboardAuthService } from './DashboardAuthService.js';
 import type { DashboardKeywordRepository, DashboardProjectionRepository, DiscordOAuthGateway } from './DashboardPorts.js';
 
@@ -21,12 +23,18 @@ function toChannelDto(channel: ManagedChannelSnapshot): DashboardChannelDto {
 }
 
 export class DashboardService {
+    private readonly reportCacheError: (error: unknown) => void;
+
     public constructor(
-        private readonly auth: DashboardAuthService,
+        private readonly auth: Pick<DashboardAuthService, 'authenticate'>,
         private readonly discord: DiscordOAuthGateway,
         private readonly projection: DashboardProjectionRepository,
-        private readonly keywords: DashboardKeywordRepository
-    ) {}
+        private readonly keywords: DashboardKeywordRepository,
+        private readonly keywordCache?: KeywordLookupCache,
+        reportCacheError: (error: unknown) => void = (): void => undefined
+    ) {
+        this.reportCacheError = reportCacheError;
+    }
 
     public async listGuilds(sessionId: string | undefined): Promise<DashboardGuildDto[]> {
         const session = await this.auth.authenticate(sessionId);
@@ -59,6 +67,7 @@ export class DashboardService {
         const { userId } = await this.requireManagedGuild(sessionId, guildId);
         const keyword = createKeyword({ guildId, channelId, trigger, responses });
         await this.keywords.saveWithAudit(keyword, userId, correlationId);
+        await this.invalidateKeywordCache({ guildId: keyword.guildId, channelId: keyword.channelId });
         return toKeywordDto(keyword);
     }
 
@@ -72,6 +81,7 @@ export class DashboardService {
         const { userId } = await this.requireManagedGuild(sessionId, guildId);
         const removed = await this.keywords.removeWithAudit({ guildId, channelId }, trigger, userId, correlationId);
         if (!removed) throw new KeywordNotFoundError(trigger);
+        await this.invalidateKeywordCache({ guildId, channelId });
     }
 
     private async requireManagedGuild(
@@ -88,5 +98,14 @@ export class DashboardService {
 
     private toGuildDto(guild: DiscordGuildMembership, botInstalled: boolean): DashboardGuildDto {
         return { id: guild.id, name: guild.name, iconUrl: discordGuildIconUrl(guild), botInstalled };
+    }
+
+    private async invalidateKeywordCache(scope: KeywordScope): Promise<void> {
+        if (!this.keywordCache) return;
+        try {
+            await this.keywordCache.invalidate(scope);
+        } catch (error) {
+            this.reportCacheError(error);
+        }
     }
 }
