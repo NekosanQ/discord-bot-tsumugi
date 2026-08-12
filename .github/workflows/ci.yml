@@ -7,11 +7,29 @@ on:
 permissions:
     contents: read
 
+concurrency:
+    group: ci-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
 jobs:
     verify:
         runs-on: ubuntu-latest
-        timeout-minutes: 15
+        timeout-minutes: 25
         services:
+            mysql:
+                image: mysql:8.4.10
+                env:
+                    MYSQL_DATABASE: tsumugi_ci
+                    MYSQL_USER: tsumugi_ci
+                    MYSQL_PASSWORD: ci-database-password
+                    MYSQL_ROOT_PASSWORD: ci-root-password
+                ports:
+                    - 3306:3306
+                options: >-
+                    --health-cmd "mysqladmin ping -h 127.0.0.1 -u root -pci-root-password --silent"
+                    --health-interval 5s
+                    --health-timeout 5s
+                    --health-retries 20
             redis:
                 image: redis:8.2.8-alpine
                 ports:
@@ -20,32 +38,58 @@ jobs:
                     --health-cmd "redis-cli ping"
                     --health-interval 5s
                     --health-timeout 3s
-                    --health-retries 5
+                    --health-retries 10
+
+        env:
+            DATABASE_URL: mysql://tsumugi_ci:ci-database-password@127.0.0.1:3306/tsumugi_ci
+            API_MYSQL_TEST_URL: mysql://tsumugi_ci:ci-database-password@127.0.0.1:3306/tsumugi_ci
+            API_REDIS_TEST_URL: redis://127.0.0.1:6379
+            BOT_REDIS_TEST_URL: redis://127.0.0.1:6379
 
         steps:
             - name: Checkout
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
+              with:
+                  persist-credentials: false
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
+            - name: Setup Node.js 24
+              uses: actions/setup-node@v6
               with:
                   node-version-file: .nvmrc
                   cache: npm
 
-            - name: Install dependencies
+            - name: Install locked dependencies
               run: npm ci
 
             - name: Generate Prisma Client
               run: npm run prisma:generate --workspace apps/api
 
-            - name: Check monorepo unit tests
+            - name: Validate Prisma schema
+              run: npm run prisma:validate --workspace apps/api
+
+            - name: Apply migrations to the ephemeral CI database
+              run: npx prisma migrate deploy --schema apps/api/prisma/schema.prisma
+
+            - name: Check every workspace
               run: npm run check
 
-            - name: Run integration tests
+            - name: Run every integration test suite
               run: npm run test:integration --workspaces --if-present
-              env:
-                  API_REDIS_TEST_URL: redis://127.0.0.1:6379
-                  BOT_REDIS_TEST_URL: redis://127.0.0.1:6379
 
-            - name: Compile production output
-              run: npm run compile
+            - name: Install the locked Chromium runtime
+              run: npm exec --workspace apps/web -- playwright install --with-deps chromium
+
+            - name: Run the Web end-to-end suite
+              run: npm run test:e2e --workspace apps/web
+
+            - name: Validate deployment assets and state transitions
+              run: |
+                  npx prettier --check compose.production.yml
+                  for script in deploy/release.sh deploy/tests/compose.test.sh deploy/tests/release.test.sh deploy/tests/fixtures/docker deploy/tests/fixtures/flock; do
+                      bash -n "$script"
+                  done
+                  bash deploy/tests/compose.test.sh
+                  bash deploy/tests/release.test.sh
+
+            - name: Compile every deployable workspace
+              run: npm run compile --workspaces --if-present

@@ -1,0 +1,106 @@
+name: Deploy or rollback
+
+on:
+    workflow_dispatch:
+        inputs:
+            environment:
+                description: GitHub Environment containing the target configuration
+                required: true
+                type: environment
+            operation:
+                description: Operation to perform on the selected target
+                required: true
+                default: deploy
+                type: choice
+                options:
+                    - deploy
+                    - rollback
+            image_sha:
+                description: Full 40-character image source SHA (required for deploy)
+                required: false
+                type: string
+
+permissions:
+    contents: read
+    packages: read
+
+concurrency:
+    group: deploy-${{ inputs.environment }}
+    cancel-in-progress: false
+
+jobs:
+    resolve-runner:
+        runs-on: ubuntu-latest
+        environment:
+            name: ${{ inputs.environment }}
+        outputs:
+            runner-label: ${{ steps.target.outputs.runner-label }}
+        steps:
+            - name: Resolve the Environment runner label
+              id: target
+              env:
+                  RUNNER_LABEL: ${{ vars.DEPLOY_RUNNER_LABEL }}
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  if [[ ! "$RUNNER_LABEL" =~ ^[A-Za-z0-9._-]+$ ]]; then
+                      echo 'DEPLOY_RUNNER_LABEL must be a single non-empty runner label.' >&2
+                      exit 1
+                  fi
+                  echo "runner-label=$RUNNER_LABEL" >> "$GITHUB_OUTPUT"
+
+    operate:
+        needs: resolve-runner
+        runs-on: [self-hosted, '${{ needs.resolve-runner.outputs.runner-label }}']
+        timeout-minutes: 30
+        environment:
+            name: ${{ inputs.environment }}
+        env:
+            TSUMUGI_DEPLOY_ROOT: ${{ vars.DEPLOY_WORKDIR }}
+            TSUMUGI_ENV_DIR: ${{ vars.DEPLOY_ENV_DIR }}
+            TSUMUGI_CONFIG_DIR: ${{ vars.DEPLOY_CONFIG_DIR }}
+            TSUMUGI_COMPOSE_PROJECT_NAME: ${{ vars.COMPOSE_PROJECT_NAME }}
+            TSUMUGI_WEB_BIND_ADDRESS: ${{ vars.WEB_BIND_ADDRESS }}
+            TSUMUGI_WEB_HOST_PORT: ${{ vars.WEB_HOST_PORT }}
+            TSUMUGI_HEALTH_TIMEOUT_SECONDS: ${{ vars.DEPLOY_HEALTH_TIMEOUT_SECONDS }}
+
+        steps:
+            - name: Checkout deployment tooling
+              uses: actions/checkout@v6
+              with:
+                  persist-credentials: false
+
+            - name: Validate workflow input
+              env:
+                  OPERATION: ${{ inputs.operation }}
+                  IMAGE_SHA: ${{ inputs.image_sha }}
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  if [[ "$OPERATION" == 'deploy' && ! "$IMAGE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+                      echo 'Deploy requires a full lowercase 40-character image SHA.' >&2
+                      exit 1
+                  fi
+
+            - name: Login to GHCR without writing application secrets
+              uses: docker/login-action@v4
+              with:
+                  registry: ghcr.io
+                  username: ${{ vars.GHCR_USERNAME || github.actor }}
+                  password: ${{ secrets.GHCR_READ_TOKEN || secrets.GITHUB_TOKEN }}
+
+            - name: Deploy immutable images
+              if: inputs.operation == 'deploy'
+              env:
+                  TSUMUGI_COMPOSE_FILE: ${{ github.workspace }}/compose.production.yml
+                  TSUMUGI_IMAGE_PREFIX: ghcr.io/${{ github.repository }}
+                  TSUMUGI_IMAGE_SHA: ${{ inputs.image_sha }}
+              shell: bash
+              run: bash ./deploy/release.sh deploy
+
+            - name: Roll back to the previous immutable image set
+              if: inputs.operation == 'rollback'
+              env:
+                  TSUMUGI_COMPOSE_FILE: ${{ github.workspace }}/compose.production.yml
+              shell: bash
+              run: bash ./deploy/release.sh rollback

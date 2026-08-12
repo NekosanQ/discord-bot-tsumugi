@@ -1,0 +1,152 @@
+name: Publish immutable images
+
+on:
+    workflow_run:
+        workflows: [CI]
+        types: [completed]
+
+permissions:
+    contents: read
+    packages: write
+    attestations: write
+    id-token: write
+
+concurrency:
+    group: publish-${{ github.event.workflow_run.head_sha }}
+    cancel-in-progress: false
+
+jobs:
+    prepare:
+        if: >-
+            github.event.workflow_run.conclusion == 'success' &&
+            github.event.workflow_run.event == 'push' &&
+            github.event.workflow_run.head_repository.full_name == github.repository &&
+            github.event.workflow_run.head_branch == github.event.repository.default_branch
+        runs-on: ubuntu-latest
+        outputs:
+            image-prefix: ${{ steps.release.outputs.image-prefix }}
+            source-sha: ${{ steps.release.outputs.source-sha }}
+        steps:
+            - name: Resolve immutable release identity
+              id: release
+              env:
+                  SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+                  REPOSITORY: ${{ github.repository }}
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+                      echo 'The release source must be a full Git commit SHA.' >&2
+                      exit 1
+                  fi
+                  image_prefix="ghcr.io/${REPOSITORY,,}"
+                  echo "image-prefix=$image_prefix" >> "$GITHUB_OUTPUT"
+                  echo "source-sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+
+    publish:
+        needs: prepare
+        runs-on: ubuntu-latest
+        timeout-minutes: 60
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - component: api
+                      dockerfile: apps/api/Dockerfile
+                      target: production
+                      repository-suffix: api
+                      tag-suffix: ''
+                    - component: api-migration
+                      dockerfile: apps/api/Dockerfile
+                      target: migration
+                      repository-suffix: api
+                      tag-suffix: -migration
+                    - component: bot
+                      dockerfile: apps/bot/Dockerfile
+                      target: production
+                      repository-suffix: bot
+                      tag-suffix: ''
+                    - component: web
+                      dockerfile: apps/web/Dockerfile
+                      target: production
+                      repository-suffix: web
+                      tag-suffix: ''
+
+        steps:
+            - name: Checkout the verified commit
+              uses: actions/checkout@v6
+              with:
+                  ref: ${{ needs.prepare.outputs.source-sha }}
+                  persist-credentials: false
+
+            - name: Require the deployable Dockerfile
+              env:
+                  DOCKERFILE: ${{ matrix.dockerfile }}
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  test -f "$DOCKERFILE" || {
+                      echo "Required Dockerfile is missing: $DOCKERFILE" >&2
+                      exit 1
+                  }
+
+            - name: Login to GHCR
+              uses: docker/login-action@v4
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Set up QEMU
+              uses: docker/setup-qemu-action@v4
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v4
+
+            - name: Resolve the only allowed tag
+              id: image
+              env:
+                  IMAGE_PREFIX: ${{ needs.prepare.outputs.image-prefix }}
+                  REPOSITORY_SUFFIX: ${{ matrix.repository-suffix }}
+                  SOURCE_SHA: ${{ needs.prepare.outputs.source-sha }}
+                  TAG_SUFFIX: ${{ matrix.tag-suffix }}
+              shell: bash
+              run: echo "reference=$IMAGE_PREFIX-$REPOSITORY_SUFFIX:sha-$SOURCE_SHA$TAG_SUFFIX" >> "$GITHUB_OUTPUT"
+
+            - name: Refuse to overwrite an existing SHA tag
+              id: existing
+              env:
+                  IMAGE_REFERENCE: ${{ steps.image.outputs.reference }}
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  error_file="$(mktemp)"
+                  trap 'rm -f "$error_file"' EXIT
+                  if docker buildx imagetools inspect "$IMAGE_REFERENCE" >/dev/null 2>"$error_file"; then
+                      echo 'exists=true' >> "$GITHUB_OUTPUT"
+                  elif grep -Eiq 'not found|manifest unknown' "$error_file"; then
+                      echo 'exists=false' >> "$GITHUB_OUTPUT"
+                  else
+                      echo 'Unable to determine whether the immutable tag already exists.' >&2
+                      exit 1
+                  fi
+
+            - name: Build and publish SHA-only image
+              if: steps.existing.outputs.exists == 'false'
+              uses: docker/build-push-action@v7
+              with:
+                  context: .
+                  file: ${{ matrix.dockerfile }}
+                  target: ${{ matrix.target }}
+                  platforms: linux/amd64,linux/arm64
+                  push: true
+                  tags: ${{ steps.image.outputs.reference }}
+                  labels: |
+                      org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+                      org.opencontainers.image.revision=${{ needs.prepare.outputs.source-sha }}
+                      org.opencontainers.image.version=sha-${{ needs.prepare.outputs.source-sha }}
+                      org.opencontainers.image.title=tsumugi-${{ matrix.component }}
+                  cache-from: type=gha,scope=${{ matrix.component }}
+                  cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+                  provenance: mode=max
+                  sbom: true
