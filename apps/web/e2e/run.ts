@@ -1,11 +1,15 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
+import { fileURLToPath } from 'node:url';
 
 const appDirectory = process.cwd();
 const fakeApiUrl = 'http://127.0.0.1:4010';
 const webHealthUrl = 'http://127.0.0.1:3001';
 const serverReadyTimeoutMs = 120_000;
 const serverStopTimeoutMs = 5_000;
+const tsxCliPath = fileURLToPath(import.meta.resolve('tsx/cli'));
+const nextCliPath = fileURLToPath(new URL('./dist/bin/next', import.meta.resolve('next/package.json')));
+const playwrightCliPath = fileURLToPath(import.meta.resolve('@playwright/test/cli'));
 
 function startNode(args: string[], environment: NodeJS.ProcessEnv = process.env): ChildProcess {
     return spawn(process.execPath, args, {
@@ -64,20 +68,20 @@ function exitCode(child: ChildProcess): Promise<number> {
 }
 
 async function run(): Promise<void> {
-    const fakeApi = startNode(['node_modules/tsx/dist/cli.mjs', 'e2e/fake-api.ts']);
+    const fakeApi = startNode([tsxCliPath, 'e2e/fake-api.ts']);
     const webEnvironment = { ...process.env };
     const internalApiVariable = 'WEB_INTERNAL_API_URL';
     const proxyTokenVariable = 'WEB_API_PROXY_TOKEN';
     webEnvironment[internalApiVariable] = fakeApiUrl;
     webEnvironment[proxyTokenVariable] = 'fake-web-proxy-token-for-e2e-only';
-    const web = startNode(['node_modules/next/dist/bin/next', 'dev', '--webpack', '--hostname', '127.0.0.1', '--port', '3001'], webEnvironment);
+    const web = startNode([nextCliPath, 'dev', '--webpack', '--hostname', '127.0.0.1', '--port', '3001'], webEnvironment);
 
     try {
         await Promise.all([
             waitForReady('fake API', `${fakeApiUrl}/health/live`, fakeApi),
             waitForReady('Web application', `${webHealthUrl}/health/live`, web)
         ]);
-        const playwright = startNode(['node_modules/@playwright/test/cli.js', 'test', '--config=playwright.config.ts']);
+        const playwright = startNode([playwrightCliPath, 'test', '--config=playwright.config.ts']);
         process.exitCode = await exitCode(playwright);
     } finally {
         await Promise.all([stopChild(web), stopChild(fakeApi)]);
