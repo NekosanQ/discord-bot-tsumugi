@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+printf '%s\n' "$*" >> "$MOCK_DOCKER_LOG"
+
+if [[ "${1:-}" == 'pull' ]]; then
+    exit 0
+fi
+
+if [[ "${1:-}" == 'image' && "${2:-}" == 'inspect' ]]; then
+    tagged_reference="${*: -1}"
+    repository="${tagged_reference%%:sha-*}"
+    digest_character='1'
+    case "$tagged_reference" in
+        *:sha-a*-migration) digest_character='2' ;;
+        *:sha-a*)
+            case "$repository" in
+                *-bot) digest_character='3' ;;
+                *-web) digest_character='4' ;;
+            esac
+            ;;
+        *:sha-b*-migration) digest_character='6' ;;
+        *:sha-b*)
+            digest_character='5'
+            case "$repository" in
+                *-bot) digest_character='7' ;;
+                *-web) digest_character='8' ;;
+            esac
+            ;;
+    esac
+    printf '%s@sha256:%064d\n' "$repository" "$digest_character"
+    exit 0
+fi
+
+if [[ "${1:-}" == 'inspect' ]]; then
+    if [[ "$*" == *'container-web'* && "$*" != *'.State.Health'* && -n "${MOCK_FAIL_WEB_DIGEST_SUFFIX:-}" && "$TSUMUGI_WEB_IMAGE" == *"$MOCK_FAIL_WEB_DIGEST_SUFFIX" && ! -e "$MOCK_FAILURE_MARKER" ]]; then
+        touch "$MOCK_FAILURE_MARKER"
+        printf 'exited\n'
+        exit 0
+    fi
+    if [[ "$*" == *'.State.Health'* ]]; then
+        printf 'healthy\n'
+    else
+        printf 'running\n'
+    fi
+    exit 0
+fi
+
+if [[ "${1:-}" == 'exec' ]]; then
+    exit 0
+fi
+
+if [[ "${1:-}" == 'compose' ]]; then
+    if [[ "${2:-}" == 'version' ]]; then
+        printf 'Docker Compose mock\n'
+        exit 0
+    fi
+    previous=''
+    for argument in "$@"; do
+        if [[ "$previous" == 'ps' && "$argument" == '-q' ]]; then
+            previous='ps-q'
+            continue
+        fi
+        if [[ "$previous" == 'ps-q' ]]; then
+            printf 'container-%s\n' "$argument"
+            exit 0
+        fi
+        previous="$argument"
+    done
+    exit 0
+fi
+
+printf 'Unexpected mock docker invocation: %s\n' "$*" >&2
+exit 1

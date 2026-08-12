@@ -5,6 +5,7 @@ run/config.toml
 *.tsbuildinfo
 *.env.*
 !.env.*.sample
+!deploy/examples/*.env.sample
 .vscode/
 development.toml
 production.toml

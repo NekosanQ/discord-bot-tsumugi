@@ -1,0 +1,254 @@
+name: ${TSUMUGI_COMPOSE_PROJECT_NAME:-tsumugi}
+
+x-runtime-logging: &runtime-logging
+    driver: local
+    options:
+        max-size: 10m
+        max-file: '5'
+
+x-application-hardening: &application-hardening
+    init: true
+    user: '1000:1000'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 256
+    pull_policy: never
+    logging: *runtime-logging
+
+services:
+    mysql:
+        image: mysql:8.4.10
+        restart: unless-stopped
+        user: mysql
+        cap_drop: [ALL]
+        security_opt: [no-new-privileges:true]
+        pids_limit: 256
+        logging: *runtime-logging
+        env_file:
+            - '${TSUMUGI_ENV_DIR:?TSUMUGI_ENV_DIR is required}/mysql.env'
+        environment:
+            TZ: Asia/Tokyo
+        volumes:
+            - mysql-data:/var/lib/mysql
+        tmpfs:
+            - /tmp:mode=1777
+        healthcheck:
+            test: [CMD-SHELL, 'MYSQL_PWD=$$MYSQL_PASSWORD mysqladmin ping -h 127.0.0.1 -u "$$MYSQL_USER" --silent']
+            interval: 10s
+            timeout: 5s
+            retries: 20
+            start_period: 30s
+        networks: [database-network]
+
+    redis-api-cache:
+        image: redis:8.2.8-alpine
+        restart: unless-stopped
+        user: redis
+        read_only: true
+        cap_drop: [ALL]
+        security_opt: [no-new-privileges:true]
+        pids_limit: 128
+        logging: *runtime-logging
+        command: [redis-server, --save, '', --appendonly, 'no', --maxmemory, 128mb, --maxmemory-policy, allkeys-lru]
+        mem_limit: 160m
+        tmpfs:
+            - /data:mode=1777
+            - /tmp:mode=1777
+        healthcheck:
+            test: [CMD, redis-cli, ping]
+            interval: 10s
+            timeout: 3s
+            retries: 5
+        networks: [api-cache-network]
+
+    redis-bot-cooldown:
+        image: redis:8.2.8-alpine
+        restart: unless-stopped
+        user: redis
+        read_only: true
+        cap_drop: [ALL]
+        security_opt: [no-new-privileges:true]
+        pids_limit: 128
+        logging: *runtime-logging
+        command: [redis-server, --save, '', --appendonly, 'no', --maxmemory, 64mb, --maxmemory-policy, volatile-ttl]
+        mem_limit: 96m
+        tmpfs:
+            - /data:mode=1777
+            - /tmp:mode=1777
+        healthcheck:
+            test: [CMD, redis-cli, ping]
+            interval: 10s
+            timeout: 3s
+            retries: 5
+        networks: [bot-cooldown-network]
+
+    redis-api-security:
+        image: redis:8.2.8-alpine
+        restart: unless-stopped
+        user: redis
+        read_only: true
+        cap_drop: [ALL]
+        security_opt: [no-new-privileges:true]
+        pids_limit: 128
+        logging: *runtime-logging
+        command: [redis-server, --save, '', --appendonly, 'no', --maxmemory, 64mb, --maxmemory-policy, noeviction]
+        mem_limit: 96m
+        tmpfs:
+            - /data:mode=1777
+            - /tmp:mode=1777
+        healthcheck:
+            test: [CMD, redis-cli, ping]
+            interval: 10s
+            timeout: 3s
+            retries: 5
+        networks: [api-security-network]
+
+    api-migrate:
+        <<: *application-hardening
+        profiles: [migration]
+        image: ${TSUMUGI_API_MIGRATION_IMAGE:?TSUMUGI_API_MIGRATION_IMAGE is required}
+        restart: 'no'
+        command: [node, /app/node_modules/prisma/build/index.js, migrate, deploy, --schema, prisma/schema.prisma]
+        env_file:
+            - '${TSUMUGI_ENV_DIR:?TSUMUGI_ENV_DIR is required}/api.env'
+        environment:
+            CHECKPOINT_DISABLE: '1'
+            NODE_ENV: production
+            PRISMA_HIDE_UPDATE_MESSAGE: 'true'
+            TZ: Asia/Tokyo
+        depends_on:
+            mysql:
+                condition: service_healthy
+        tmpfs:
+            - /tmp:mode=1777
+        networks: [database-network]
+
+    api:
+        <<: *application-hardening
+        image: ${TSUMUGI_API_IMAGE:?TSUMUGI_API_IMAGE is required}
+        restart: unless-stopped
+        command: [node, dist/index.js]
+        stop_grace_period: 15s
+        env_file:
+            - '${TSUMUGI_ENV_DIR:?TSUMUGI_ENV_DIR is required}/api.env'
+        environment:
+            NODE_ENV: production
+            TZ: Asia/Tokyo
+        volumes:
+            - type: bind
+              source: ${TSUMUGI_CONFIG_DIR:?TSUMUGI_CONFIG_DIR is required}/api.production.toml
+              target: /app/apps/api/config/production.toml
+              read_only: true
+        tmpfs:
+            - /tmp:mode=1777
+        depends_on:
+            mysql:
+                condition: service_healthy
+            redis-api-security:
+                condition: service_healthy
+        healthcheck:
+            test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+            interval: 10s
+            timeout: 3s
+            retries: 10
+            start_period: 10s
+        networks:
+            bot-api-network:
+                aliases: [api]
+            web-api-network:
+                aliases: [api]
+            database-network:
+            api-cache-network:
+            api-security-network:
+
+    bot:
+        <<: *application-hardening
+        image: ${TSUMUGI_BOT_IMAGE:?TSUMUGI_BOT_IMAGE is required}
+        restart: unless-stopped
+        command: [node, dist/index.js]
+        stop_grace_period: 20s
+        env_file:
+            - '${TSUMUGI_ENV_DIR:?TSUMUGI_ENV_DIR is required}/bot.env'
+        environment:
+            NODE_ENV: production
+            TZ: Asia/Tokyo
+        volumes:
+            - type: bind
+              source: ${TSUMUGI_CONFIG_DIR:?TSUMUGI_CONFIG_DIR is required}/bot.production.toml
+              target: /app/apps/bot/config/production.toml
+              read_only: true
+            - bot-logs:/app/apps/bot/run
+        tmpfs:
+            - /tmp:mode=1777
+        depends_on:
+            api:
+                condition: service_healthy
+        healthcheck:
+            test: [CMD, node, -e, 'try{process.kill(1,0)}catch{process.exit(1)}']
+            interval: 20s
+            timeout: 3s
+            retries: 5
+            start_period: 20s
+        networks: [bot-api-network, bot-cooldown-network]
+
+    web:
+        <<: *application-hardening
+        image: ${TSUMUGI_WEB_IMAGE:?TSUMUGI_WEB_IMAGE is required}
+        restart: unless-stopped
+        stop_grace_period: 15s
+        env_file:
+            - '${TSUMUGI_ENV_DIR:?TSUMUGI_ENV_DIR is required}/web.env'
+        environment:
+            NODE_ENV: production
+            PORT: 3001
+            HOSTNAME: 0.0.0.0
+            TZ: Asia/Tokyo
+        volumes:
+            - type: bind
+              source: ${TSUMUGI_CONFIG_DIR:?TSUMUGI_CONFIG_DIR is required}/web.production.toml
+              target: /app/apps/web/config/production.toml
+              read_only: true
+        tmpfs:
+            - /tmp:mode=1777
+            - /app/apps/web/.next/cache:mode=0700,uid=1000,gid=1000
+        depends_on:
+            api:
+                condition: service_healthy
+        ports:
+            - name: web
+              target: 3001
+              published: ${TSUMUGI_WEB_HOST_PORT:?TSUMUGI_WEB_HOST_PORT is required}
+              host_ip: ${TSUMUGI_WEB_BIND_ADDRESS:?TSUMUGI_WEB_BIND_ADDRESS is required}
+              protocol: tcp
+        healthcheck:
+            test: [CMD, node, -e, "fetch('http://127.0.0.1:3001/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+            interval: 10s
+            timeout: 3s
+            retries: 10
+            start_period: 10s
+        networks: [web-api-network]
+
+networks:
+    bot-api-network:
+        driver: bridge
+    web-api-network:
+        driver: bridge
+    database-network:
+        driver: bridge
+        internal: true
+    api-cache-network:
+        driver: bridge
+        internal: true
+    api-security-network:
+        driver: bridge
+        internal: true
+    bot-cooldown-network:
+        driver: bridge
+        internal: true
+
+volumes:
+    mysql-data:
+        driver: local
+    bot-logs:
+        driver: local
