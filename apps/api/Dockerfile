@@ -7,8 +7,9 @@ USER node
 COPY --chown=node:node package*.json ./
 COPY --chown=node:node apps/api/package.json ./apps/api/package.json
 COPY --chown=node:node apps/bot/package.json ./apps/bot/package.json
+COPY --chown=node:node apps/web/package.json ./apps/web/package.json
 COPY --chown=node:node packages/contracts/package.json ./packages/contracts/package.json
-RUN npm install
+RUN npm ci
 
 FROM dependencies AS production-dependencies
 RUN npm prune --omit=dev

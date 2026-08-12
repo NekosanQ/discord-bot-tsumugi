@@ -1,0 +1,2 @@
+apiTimeoutMs = 5000
+requestBodyLimitBytes = 16384

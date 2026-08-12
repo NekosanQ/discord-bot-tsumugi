@@ -1,0 +1,47 @@
+{
+    "name": "@tsumugi/web",
+    "version": "3.0.0",
+    "private": true,
+    "description": "Tsumugi server management dashboard",
+    "type": "module",
+    "engines": {
+        "node": "24.x",
+        "npm": ">=10"
+    },
+    "scripts": {
+        "build:contracts": "node ../../node_modules/typescript/bin/tsc -p ../../packages/contracts/tsconfig.build.json",
+        "predev": "npm run build:contracts",
+        "dev": "next dev --webpack --hostname 0.0.0.0 --port 3001",
+        "start": "next start --hostname 0.0.0.0 --port 3001",
+        "precompile": "npm run build:contracts",
+        "compile": "next build --webpack",
+        "prebuild": "npm run build:contracts",
+        "build": "next build --webpack",
+        "pretypecheck": "npm run build:contracts",
+        "typecheck": "tsc --noEmit -p tsconfig.json",
+        "pretest:unit": "npm run build:contracts",
+        "test:unit": "tsx --tsconfig tsconfig.test.json --test \"tests/**/*.test.ts\"",
+        "test:e2e": "tsx --tsconfig tsconfig.test.json e2e/run.ts",
+        "e2e": "npm run test:e2e",
+        "test": "npm run test:unit",
+        "check:architecture": "eslint src tests e2e --max-warnings=0 --no-error-on-unmatched-pattern",
+        "check": "npm run lint:prettier && npm run check:architecture && npm run typecheck && npm run test:unit",
+        "lint:prettier": "prettier --check --no-error-on-unmatched-pattern src tests e2e config package.json README.md next.config.ts playwright.config.ts \"tsconfig*.json\"",
+        "fix:prettier": "prettier --write --no-error-on-unmatched-pattern src tests e2e config package.json README.md next.config.ts playwright.config.ts \"tsconfig*.json\""
+    },
+    "dependencies": {
+        "@tsumugi/contracts": "1.0.0",
+        "next": "16.2.12",
+        "react": "19.2.8",
+        "react-dom": "19.2.8",
+        "toml": "3.0.0"
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.58.2",
+        "@types/node": "^24.0.0",
+        "@types/react": "^19.2.0",
+        "@types/react-dom": "^19.2.0",
+        "tsx": "^4.20.5",
+        "typescript": "^5.4.5"
+    }
+}
