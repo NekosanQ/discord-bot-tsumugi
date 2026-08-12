@@ -11,7 +11,7 @@
 
 ## 現状認識
 
-- Stage 3までローカル実装が完了しており、rootはnpm workspaceの統括、Botは `apps/bot`、サーバー管理APIは `apps/api`、version付きcontractは `packages/contracts` に配置している。`apps/web` はまだ作成していない。実環境のMySQLを含むcache導入前後latencyは未計測であり、配備前に確認する。
+- Stage 4までローカル実装が完了しており、rootはnpm workspaceの統括、Botは `apps/bot`、サーバー管理APIは `apps/api`、Webダッシュボードは `apps/web`、version付きcontractは `packages/contracts` に配置している。Webのunit test、fake APIを使うbrowser E2E、production buildは確認済みだが、実Discord OAuth、実環境のMySQL/Redis、公開TLS経路は未確認である。cache導入前後latencyも未計測であり、配備前に確認する。
 - `apps/bot/src/index.ts` は直接実行時だけproduction bootstrapを起動する。Discord Client、Prisma Client、CommandHandlerの生成は `apps/bot/src/bootstrap/` にあり、下位コードからentrypointへの逆importは依存注入へ置換済みである。
 - `apps/bot/src/commands/` と `apps/bot/src/events/` にはimport時に生成されるシングルトンが多い。既存コードとして当面許容するが、新規・移行済みコードでは増やさない。
 - Prisma schemaとmigrationは `apps/api/prisma/` にあり、APIのPrisma persistence adapterだけが直接accessする。BotへPrisma依存を戻さない。
@@ -155,7 +155,7 @@ docker-compose.yml                  # 開発・運用サービスの構成
 - APIのキーワード参照へcache-asideを導入し、Botの複数processで必要なcooldownを原子的に共有する。
 - Docker、設定、health/degraded状態、メトリクス、integration・障害テストまで揃えて完了とする。
 
-### Stage 4: サーバー管理ダッシュボードを追加する
+### Stage 4: サーバー管理ダッシュボードを追加する（2026-08-12ローカル実装完了）
 
 - `apps/web` を独立workspaceとして作り、API contractだけを介してguild設定を参照・更新する。
 - Discord OAuthのcredential交換・refresh・権限検証はAPI側で管理し、Web/browserはHttpOnly session以外の長期credentialを保持しない。
@@ -163,7 +163,7 @@ docker-compose.yml                  # 開発・運用サービスの構成
 - 入力検証、CSRF対策、rate limit、重要mutationの監査範囲を実装前に定義する。
 - `tests/` と `e2e/` を最初から実行可能にし、buildだけで画面動作を確認済みとしない。
 
-### Stage 5: 残りのBot機能を移行する
+### Stage 5: 残りのBot機能を移行する（進行中）
 
 - `general`、`fun`、help、guild eventなどを1機能ずつ移行する。
 - 移行済み機能から旧シングルトンと `apps/bot/src/index.ts` 逆importを除去し、参照のなくなった旧コードだけを削除する。
@@ -259,6 +259,12 @@ npm.cmd run prisma:generate --workspace apps/api
 npm.cmd run check
 ```
 
+Webのbrowser動作へ影響する場合:
+
+```powershell
+npm.cmd run test:e2e --workspace apps/web
+```
+
 配布物やDocker buildへ影響する場合はrootで `npm.cmd run compile` も実行する。monorepo全体の検査はrootで `npm.cmd run check` を実行する。
 
 Prisma変更時:
@@ -269,7 +275,7 @@ npm.cmd run prisma:validate --workspace apps/api
 
 - `prisma validate` にはprocess環境の `DATABASE_URL` が必要である。schema検証だけなら接続は行わないため、実値を読まず構文上有効な非秘密placeholderを一時設定してよい。値を表示せず、用意できなければ未実施として報告する。
 - schema整形時は `npx.cmd prisma format --schema apps/api/prisma/schema.prisma` を実行し、書き換えられた差分を確認する。
-- Stage 1完了後はBotの `check`、`test:unit`、`test:integration`、Stage 2完了後はAPIの `prisma:generate`、`prisma:validate`、`check`、`test:unit`、`test:integration`、Stage 4完了後はWebの `check`、`test`、`e2e` を各workspace scriptとして定義する。rootから `npm.cmd run <script> --workspace apps/<app>` で実行し、この現行command一覧も新pathへ更新する。
+- Botは `check`、`test:unit`、`test:integration`、APIは `prisma:generate`、`prisma:validate`、`check`、`test:unit`、`test:integration`、Webは `check`、`test:unit`、`test:e2e` を各workspace scriptとして定義する。rootから `npm.cmd run <script> --workspace apps/<app>` で実行する。
 - Compose変更時は `docker compose config --quiet`、必要に応じて対象serviceのbuildとhealthを確認する。
 - Bot変更時は、変更範囲に応じて `npm.cmd run test:unit --workspace apps/bot` と `npm.cmd run test:integration --workspace apps/bot` を実行する。
 - 静的検証はDiscord login、command登録、MySQL migration、Redis接続、Docker起動を証明しない。実行していないものを「動作確認済み」と表現しない。
