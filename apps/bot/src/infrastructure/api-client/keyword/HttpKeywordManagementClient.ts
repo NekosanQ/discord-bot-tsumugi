@@ -4,11 +4,14 @@ import {
     parseApiErrorResponse,
     parseKeywordDto,
     parseKeywordListResponse,
-    parseResolveKeywordResponse
+    parseResolveKeywordResponse,
+    type SyncGuildSnapshotRequest
 } from '@tsumugi/contracts';
 
-import type { GuildInstallationManagement } from '../../../application/guild/GuildInstallationManagement.js';
+import type { GuildSnapshot, GuildSnapshotSynchronization } from '../../../application/guild/GuildSnapshotSynchronization.js';
 import type { KeywordManagement, KeywordRecord, KeywordScope } from '../../../application/keyword/KeywordManagement.js';
+
+export type HttpFetcher = (input: URL, init: RequestInit) => Promise<Response>;
 
 export class KeywordApiError extends Error {
     public constructor(
@@ -21,11 +24,12 @@ export class KeywordApiError extends Error {
     }
 }
 
-export class HttpKeywordManagementClient implements KeywordManagement, GuildInstallationManagement {
+export class HttpKeywordManagementClient implements KeywordManagement, GuildSnapshotSynchronization {
     public constructor(
         private readonly baseUrl: string,
         private readonly serviceToken: string,
-        private readonly timeoutMs: number
+        private readonly timeoutMs: number,
+        private readonly fetcher: HttpFetcher = fetch
     ) {}
 
     public async save(keyword: KeywordRecord): Promise<void> {
@@ -48,15 +52,24 @@ export class HttpKeywordManagementClient implements KeywordManagement, GuildInst
         return parseResolveKeywordResponse(await this.post('/v1/keywords/resolve', { ...scope, content })).match ?? undefined;
     }
 
-    public async setInstallation(guildId: string, installed: boolean): Promise<void> {
-        await this.post('/v1/guilds/installation', { guildId, installed });
+    public async sync(snapshot: GuildSnapshot): Promise<void> {
+        const request: SyncGuildSnapshotRequest = {
+            guildId: snapshot.guildId,
+            installed: snapshot.installed,
+            channels: snapshot.channels.map((channel) => ({ ...channel }))
+        };
+        await this.request('PUT', '/v1/internal/guilds/snapshot', request);
     }
 
     private async post(pathname: string, body: unknown): Promise<unknown> {
+        return this.request('POST', pathname, body);
+    }
+
+    private async request(method: 'POST' | 'PUT', pathname: string, body: unknown): Promise<unknown> {
         const headers = new Headers({ authorization: `Bearer ${this.serviceToken}` });
         headers.set('content-type', 'application/json');
-        const response = await fetch(new URL(pathname, this.baseUrl), {
-            method: 'POST',
+        const response = await this.fetcher(new URL(pathname, this.baseUrl), {
+            method,
             headers,
             body: JSON.stringify(body),
             signal: AbortSignal.timeout(this.timeoutMs)

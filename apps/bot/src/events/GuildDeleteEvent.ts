@@ -1,6 +1,5 @@
 import { Guild, TextChannel } from 'discord.js';
 
-import type { GuildInstallationManagement } from '../application/guild/GuildInstallationManagement.js';
 import { config } from '../utils/config.js';
 import { dateTimeFormatter } from '../utils/dateTimeFormatter.js';
 import { embeds } from '../utils/EmbedGenerator.js';
@@ -10,17 +9,7 @@ import { EventBase } from './base/event_base.js';
 export class GuildDeleteEvent extends EventBase<'guildDelete'> {
     public eventName = 'guildDelete' as const;
 
-    public constructor(private readonly guildInstallation: GuildInstallationManagement) {
-        super();
-    }
-
     public async listener(guild: Guild): Promise<void> {
-        try {
-            await this.guildInstallation.setInstallation(guild.id, false);
-        } catch (error) {
-            logger.warn('サーバー退出状態の更新に失敗', error);
-        }
-
         try {
             let ownerName = '不明';
             let ownerId = '不明';

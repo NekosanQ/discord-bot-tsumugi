@@ -9,6 +9,7 @@ import { FollowAnnouncement } from '../application/general/follow/FollowAnnounce
 import { GetGuildInformation } from '../application/general/guild/GetGuildInformation.js';
 import { MeasurePing } from '../application/general/ping/MeasurePing.js';
 import { GetUserInformation } from '../application/general/user/GetUserInformation.js';
+import { SyncGuildSnapshot } from '../application/guild/SyncGuildSnapshot.js';
 import CommandHandler from '../commands/CommandHandler.js';
 import { createCommands } from '../commands/index.js';
 import EventHandler from '../events/EventHandler.js';
@@ -26,8 +27,10 @@ import { DiscordGuildInformationReader } from '../infrastructure/general/guild/D
 import { SafeCommandFailureLogger } from '../infrastructure/general/SafeCommandFailureLogger.js';
 import { SystemClock } from '../infrastructure/general/SystemClock.js';
 import { DiscordUserInformationReader } from '../infrastructure/general/user/DiscordUserInformationReader.js';
+import { SafeGuildSnapshotSyncLogger } from '../infrastructure/guild/SafeGuildSnapshotSyncLogger.js';
 import { RedisConnection } from '../infrastructure/redis/RedisConnection.js';
 import { RedisMetrics } from '../infrastructure/redis/RedisMetrics.js';
+import { DiscordGuildSnapshotSynchronizer } from '../interface-adapter/discord/guild-snapshot/DiscordGuildSnapshotSynchronizer.js';
 import { DiscordEmbedFactory } from '../interface-adapter/discord/presentation/DiscordEmbedFactory.js';
 import CommandService from '../services/CommandService.js';
 import { type Config, initializeConfig, loadConfig, resetConfigAfterFailedInitialization } from '../utils/config.js';
@@ -52,6 +55,9 @@ export async function createProductionApplication(discordToken: string, apiServi
             applicationConfig.serverManagementApi.baseUrl,
             apiServiceToken,
             applicationConfig.serverManagementApi.timeoutMs
+        );
+        const guildSnapshots = new DiscordGuildSnapshotSynchronizer(
+            new SyncGuildSnapshot(keywordManagement, new SafeGuildSnapshotSyncLogger(logger))
         );
         const redisMetrics = new RedisMetrics((state): void => {
             if (state === 'degraded') logger.warn('Bot Redis cooldown state: degraded');
@@ -143,7 +149,7 @@ export async function createProductionApplication(discordToken: string, apiServi
         const commandHandler = new CommandHandler(commands, client, applicationConfig.guildId, cooldownStore);
         CommandService.initialize(commandHandler);
 
-        const createdEvents = createEvents({ client, commandHandler, keywordManagement });
+        const createdEvents = createEvents({ client, commandHandler, guildSnapshots, keywordManagement });
         const eventHandler = new EventHandler(createdEvents.events);
 
         return createApplication({
