@@ -93,9 +93,10 @@ export class PrismaDashboardAuthRepository implements DashboardAuthRepository {
         });
     }
 
-    public async revokeSession(idHash: string, now: Date): Promise<void> {
-        await this.run(async (): Promise<void> => {
-            await this.prisma.dashboardSession.updateMany({ where: { idHash, revokedAt: null }, data: { revokedAt: now } });
+    public async revokeSession(idHash: string, now: Date): Promise<boolean> {
+        return this.run(async (): Promise<boolean> => {
+            const revoked = await this.prisma.dashboardSession.updateMany({ where: { idHash, revokedAt: null }, data: { revokedAt: now } });
+            return revoked.count === 1;
         });
     }
 

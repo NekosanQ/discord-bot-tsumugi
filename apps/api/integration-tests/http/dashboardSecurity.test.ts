@@ -48,8 +48,8 @@ class EmptyAuthRepository implements DashboardAuthRepository {
         return Promise.resolve(false);
     }
 
-    public revokeSession(): Promise<void> {
-        return Promise.resolve();
+    public revokeSession(): Promise<boolean> {
+        return Promise.resolve(false);
     }
 }
 

@@ -231,7 +231,6 @@ export function createDashboardHttpHandler(options: DashboardHttpHandlerOptions)
             if (request.method === 'POST' && requestUrl.pathname === '/v1/dashboard/logout') {
                 assertMutationRequest(request, options.origin);
                 await options.auth.verifyCsrf(sessionId, csrfCookie, request.headers['x-csrf-token'] as string | undefined);
-                await enforceRateLimit(options.rateLimiter, 'mutation', sessionId ?? 'anonymous');
                 await options.auth.logout(sessionId);
                 response.setHeader('set-cookie', [
                     clearCookie(names.session, options.secureCookies, true, 'Lax'),

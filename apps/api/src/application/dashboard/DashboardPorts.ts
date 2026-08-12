@@ -47,7 +47,7 @@ export interface DashboardAuthRepository {
         tokens: Pick<DashboardSessionRecord, 'accessTokenCiphertext' | 'refreshTokenCiphertext' | 'tokenExpiresAt'>
     ) => Promise<void>;
     touchSession: (idHash: string, idleExpiresAt: Date, now: Date) => Promise<boolean>;
-    revokeSession: (idHash: string, now: Date) => Promise<void>;
+    revokeSession: (idHash: string, now: Date) => Promise<boolean>;
 }
 
 export interface SecretCodec {

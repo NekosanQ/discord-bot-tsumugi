@@ -118,8 +118,8 @@ export class DashboardAuthService {
         if (!sessionId) return;
         const idHash = this.secrets.digest(sessionId);
         const session = await this.repository.findSession(idHash);
-        if (!session) return;
-        await this.repository.revokeSession(idHash, this.clock());
+        if (!session || session.revokedAt) return;
+        if (!(await this.repository.revokeSession(idHash, this.clock()))) return;
         try {
             await this.discord.revoke(this.secrets.unprotect(session.accessTokenCiphertext));
         } catch (error) {
