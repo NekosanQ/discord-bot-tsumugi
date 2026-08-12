@@ -40,6 +40,8 @@ services:
         depends_on:
             api-migrate-development:
                 condition: service_completed_successfully
+            redis-api-security:
+                condition: service_healthy
         healthcheck:
             test: [CMD, node, -e, "fetch('http://localhost:3000/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
             interval: 10s
@@ -50,6 +52,33 @@ services:
                 aliases: [api]
             api-cache-network:
             api-security-network:
+
+    web-development:
+        profiles: [development]
+        restart: always
+        build:
+            context: .
+            dockerfile: apps/web/Dockerfile
+            target: development
+        container_name: discord-bot-tsumugi-web-dev
+        env_file: [.env.web.dev]
+        environment:
+            NODE_ENV: development
+            TZ: Asia/Tokyo
+        volumes:
+            - ./apps/web/src:/app/apps/web/src
+            - ./apps/web/config:/app/apps/web/config
+        depends_on:
+            api-development:
+                condition: service_healthy
+        ports:
+            - 127.0.0.1:3001:3001
+        healthcheck:
+            test: [CMD, node, -e, "fetch('http://localhost:3001/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+            interval: 10s
+            timeout: 3s
+            retries: 5
+        networks: [discord-bot-network]
 
     api-migrate-development:
         profiles: [development]
@@ -81,7 +110,7 @@ services:
         depends_on:
             api-production:
                 condition: service_healthy
-        networks: [discord-bot-network]
+        networks: [discord-bot-network, bot-cooldown-network]
 
     api-production:
         profiles: [production]
@@ -98,6 +127,8 @@ services:
         depends_on:
             api-migrate-production:
                 condition: service_completed_successfully
+            redis-api-security:
+                condition: service_healthy
         healthcheck:
             test: [CMD, node, -e, "fetch('http://localhost:3000/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
             interval: 10s
@@ -108,6 +139,30 @@ services:
                 aliases: [api]
             api-cache-network:
             api-security-network:
+
+    web-production:
+        profiles: [production]
+        restart: always
+        build:
+            context: .
+            dockerfile: apps/web/Dockerfile
+            target: production
+        container_name: discord-bot-tsumugi-web-prod
+        env_file: [.env.web.prod]
+        environment:
+            NODE_ENV: production
+            TZ: Asia/Tokyo
+        depends_on:
+            api-production:
+                condition: service_healthy
+        ports:
+            - 127.0.0.1:3001:3001
+        healthcheck:
+            test: [CMD, node, -e, "fetch('http://localhost:3001/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+            interval: 10s
+            timeout: 3s
+            retries: 5
+        networks: [discord-bot-network]
 
     api-migrate-production:
         profiles: [production]
@@ -123,7 +178,7 @@ services:
         networks: [discord-bot-network]
 
     mysql:
-        image: mysql:8.4
+        image: mysql:8.4.10
         container_name: discord-bot-tsumugi-mysql
         restart: always
         env_file: [.env.mysql]
