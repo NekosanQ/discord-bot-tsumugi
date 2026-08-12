@@ -188,7 +188,26 @@ export default [
      * 無視するファイル・ディレクトリ
      */
     {
-        ignores: ['**/node_modules/', '**/dist/', '**/logs/', '**/run/', '*.config.js', '*.config.ts', '.env', '.env.*']
+        ignores: [
+            '**/node_modules/',
+            '**/.next/',
+            '**/dist/',
+            '**/logs/',
+            '**/run/',
+            '**/*.config.js',
+            '**/*.config.ts',
+            '**/next-env.d.ts',
+            '.env',
+            '.env.*'
+        ]
+    },
+    /** Next App Routerからbootstrapへ接続する単一のcomposition bridge */
+    {
+        files: ['apps/web/src/app/_composition/dashboard.ts'],
+        rules: {
+            'import/no-restricted-paths': 'off',
+            'no-restricted-imports': 'off'
+        }
     },
     /**
      * Prettierとの競合を避ける設定

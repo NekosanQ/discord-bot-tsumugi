@@ -8,8 +8,8 @@ import {
     parseSaveDashboardKeywordRequest
 } from '../../src/index.js';
 
-describe('dashboard contract', (): void => {
-    it('認証済みsessionを実行時検証する', (): void => {
+void describe('dashboard contract', (): void => {
+    void it('認証済みsessionを実行時検証する', (): void => {
         assert.deepEqual(
             parseDashboardSessionResponse({
                 authenticated: true,
@@ -24,7 +24,7 @@ describe('dashboard contract', (): void => {
         );
     });
 
-    it('管理対象guild一覧を実行時検証する', (): void => {
+    void it('管理対象guild一覧を実行時検証する', (): void => {
         assert.deepEqual(
             parseDashboardGuildListResponse({
                 guilds: [{ id: '123', name: 'server', iconUrl: null, botInstalled: true }]
@@ -33,7 +33,7 @@ describe('dashboard contract', (): void => {
         );
     });
 
-    it('keyword responseの不正な配列要素を拒否する', (): void => {
+    void it('keyword responseの不正な配列要素を拒否する', (): void => {
         assert.throws(() => parseSaveDashboardKeywordRequest({ trigger: 'hello', responses: ['world', 1] }), ContractValidationError);
     });
 });

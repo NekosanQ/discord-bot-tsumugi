@@ -1,9 +1,7 @@
 import { cookies, headers } from 'next/headers';
 
 import type { DashboardRequestContext } from '../../application/dashboard/DashboardGateway.js';
-// Next App Router entrypoints are composition roots. Keep the architecture
-// exception in this single bridge instead of importing infrastructure in pages.
-// eslint-disable-next-line no-restricted-imports
+// Next App Router entrypoints use this single explicit composition bridge.
 import { createDashboardComposition } from '../../bootstrap/createDashboardComposition.js';
 
 export { createDashboardComposition };
